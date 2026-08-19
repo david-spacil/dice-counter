@@ -1,4 +1,10 @@
+import sys
+from os import name, system
+
 hraci = {}
+
+def clear() -> None:
+    _ = system('cls') if name == 'nt' else system('clear') 
 
 def char_create() -> bool:
     global hraci
@@ -28,7 +34,14 @@ def char_create() -> bool:
 
 def main() -> None:
     if char_create():
+        clear()
         print("Vytvoření hráči:", ", ".join(list(hraci.keys())))
+    else:
+        print("Nastala chyba při vytváření uživatelů.")
+        sys.exit()
+    input("Stiskněte libovolnou klávesu pro pokračování. ")
+
+    
 
 if __name__ == "__main__":
     main()
