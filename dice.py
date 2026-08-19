@@ -14,7 +14,7 @@ def clear() -> None:
 def char_create() -> bool:
     global pointer
     global first
-    
+
     while True:
         inp: str = input("Zadejte jméno prvního hráče: ")
         if inp:
@@ -22,17 +22,21 @@ def char_create() -> bool:
             score[inp] = 0
             pointer = inp
             first = inp
+            clear()
             print(f"Hráč/ka {inp} přidán(a).")
             break
         else:
+            clear()
             print("Jméno nesmí být prázdné.")
 
     while True:
         inp = input("Zadejte jméno dalšího hráče (nebo nechte prázdné pro ukončení zadávání): ")
         if inp:
             if inp in hraci:
+                clear()
                 print("Je potřeba zadávat unikátní jména.")
             else:
+                clear()
                 hraci[inp] = []
                 score[inp] = 0
                 print(f"Hráč/ka {inp} přidán(a).")
@@ -46,10 +50,10 @@ def next_player() -> None:
 
     keys_iter = iter(hraci)
     for key in keys_iter:
-        if key == pointer: 
-            nxt_key = next(keys_iter, first) 
+        if key == pointer:
+            nxt_key = next(keys_iter, first)
             break
-       
+
     pointer = nxt_key
 
 table_header = ["Hráč", "Skóre"]
@@ -77,9 +81,10 @@ def game():
         add_score(pointer, inp_int)
         next_player()
         # break
-    
+
 
 def main() -> None:
+    clear()
     if char_create():
         clear()
         print("Vytvoření hráči:", ", ".join(list(hraci.keys())))
@@ -91,7 +96,7 @@ def main() -> None:
 
     game()
 
-    
+
 
 if __name__ == "__main__":
     main()
