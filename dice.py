@@ -4,6 +4,7 @@ from os import name, system
 from tabulate import tabulate
 
 hraci = {}
+score = {}
 pointer = ""
 first = ""
 
@@ -17,7 +18,8 @@ def char_create() -> bool:
     while True:
         inp: str = input("Zadejte jméno prvního hráče: ")
         if inp:
-            hraci[inp] = 0
+            hraci[inp] = []
+            score[inp] = 0
             pointer = inp
             first = inp
             print(f"Hráč/ka {inp} přidán(a).")
@@ -31,7 +33,8 @@ def char_create() -> bool:
             if inp in hraci:
                 print("Je potřeba zadávat unikátní jména.")
             else:
-                hraci[inp] = 0
+                hraci[inp] = []
+                score[inp] = 0
                 print(f"Hráč/ka {inp} přidán(a).")
         else:
             break
@@ -53,11 +56,11 @@ table_header = ["Hráč", "Skóre"]
 
 def table():
     hraci_tab = []
-    for h in hraci:
+    for h, h_val in score.items():
         hrac = h
         if pointer == h:
             hrac = "> "+h
-        hraci_tab.append([hrac, hraci[h]])
+        hraci_tab.append([hrac, h_val])
 
     return tabulate(hraci_tab, headers=table_header, tablefmt="fancy_grid")
 
@@ -69,7 +72,11 @@ def game():
     while True:
         clear()
         print(table())
-        break
+        inp = input(f"Zadejte skóre hráče {pointer}: ")
+        inp_int = int(inp)
+        add_score(pointer, inp_int)
+        next_player()
+        # break
     
 
 def main() -> None:
