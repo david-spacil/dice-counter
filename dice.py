@@ -2,17 +2,22 @@ import sys
 from os import name, system
 
 hraci = {}
+pointer = ""
+first = ""
 
 def clear() -> None:
     _ = system('cls') if name == 'nt' else system('clear') 
 
 def char_create() -> bool:
-    global hraci
+    global pointer
+    global first
     
     while True:
         inp: str = input("Zadejte jméno prvního hráče: ")
         if inp:
             hraci[inp] = 0
+            pointer = inp
+            first = inp
             print(f"Hráč/ka {inp} přidán(a).")
             break
         else:
@@ -31,6 +36,17 @@ def char_create() -> bool:
 
     return True
 
+def next_player() -> None:
+    global pointer
+
+    keys_iter = iter(hraci)
+    for key in keys_iter:
+        if key == pointer: 
+            nxt_key = next(keys_iter, first) 
+            break
+       
+    pointer = nxt_key
+
 def game():
     while True:
         table()
@@ -43,7 +59,10 @@ def main() -> None:
     else:
         print("Nastala chyba při vytváření uživatelů.")
         sys.exit()
+
     input("Stiskněte libovolnou klávesu pro pokračování. ")
+
+    game()
 
     
 
