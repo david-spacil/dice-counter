@@ -1,6 +1,8 @@
 import sys
 from os import name, system
 
+from tabulate import tabulate
+
 hraci = {}
 pointer = ""
 first = ""
@@ -47,9 +49,23 @@ def next_player() -> None:
        
     pointer = nxt_key
 
+table_header = ["Hráč", "Skóre"]
+
+def table():
+    hraci_tab = []
+    for h in hraci:
+        hrac = h
+        if pointer == h:
+            hrac = "> "+h
+        hraci_tab.append([hrac, hraci[h]])
+
+    return tabulate(hraci_tab, headers=table_header, tablefmt="fancy_grid")
+
 def game():
     while True:
-        table()
+        clear()
+        print(table())
+        break
     
 
 def main() -> None:
