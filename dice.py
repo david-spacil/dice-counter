@@ -31,6 +31,10 @@ def char_create() -> bool:
 
     return True
 
+def game():
+    while True:
+        table()
+    
 
 def main() -> None:
     if char_create():
