@@ -61,6 +61,10 @@ def table():
 
     return tabulate(hraci_tab, headers=table_header, tablefmt="fancy_grid")
 
+def add_score(hrac, hodnota):
+    hraci[hrac].append(hodnota)
+    score[hrac] += hodnota
+
 def game():
     while True:
         clear()
