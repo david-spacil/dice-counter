@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["flask", "qrcode"]
+# ///
 """Webové počitadlo pro domácí síť.
 
 Telefon zapisuje skóre (`/game/<id>`), notebook ukazuje zápisník (`/board`).

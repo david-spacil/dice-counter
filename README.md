@@ -9,10 +9,11 @@ ten samý Adam jako z minulého měsíce. Žádné účty, žádná hesla.
 ## Spuštění
 
 ```bash
-python -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python web.py
+uv run web.py
 ```
+
+To je celé. Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará
+sám — není co instalovat ani aktivovat.
 
 Server vypíše všechny adresy, na kterých je dostupný:
 
@@ -72,11 +73,30 @@ při remíze na prvním místě se hraje dál.
 Terminálová verze zůstává funkční jako záloha:
 
 ```bash
-.venv/bin/python dice.py
+uv run dice.py
+```
+
+## Bez uv
+
+Když `uv` po ruce není, jde to postaru:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python web.py
+```
+
+Na Fedoře stačí i systémové balíčky, pak se nemusí řešit vůbec nic:
+
+```bash
+sudo dnf install python3-flask python3-qrcode python3-tabulate
+python3 web.py
 ```
 
 ## Testy
 
 ```bash
-.venv/bin/python -m pytest tests/ -v
+uv run --with-requirements requirements.txt --no-project pytest
 ```
+
+Nebo z připraveného prostředí prostě `pytest`.

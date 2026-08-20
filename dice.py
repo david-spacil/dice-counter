@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["tabulate"]
+# ///
 """Počitadlo skóre v terminálu.
 
 Pravidla žijí v `core.Game`, tenhle modul je jen vstup a výstup. Hraje se
