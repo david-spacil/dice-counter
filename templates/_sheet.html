@@ -1,0 +1,57 @@
+{% if winner %}
+<div class="win">
+  <p class="eyebrow">Konec hry</p>
+  <h2>{{ winner }}</h2>
+  <p>Vyhrává s {{ totals[winner]|cislo }} body z cílových {{ game.final_score|cislo }}.</p>
+</div>
+{% endif %}
+
+<div class="sheet-wrap">
+  <table class="sheet">
+    <thead>
+      <tr>
+        <th class="label">Kolo</th>
+        {% for name in game.names %}
+        <th class="{{ 'marked' if name == current }}">{{ name }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="label">{{ row.round }}</td>
+        {% for cell in row.cells %}
+        <td class="{{ 'marked' if game.names[loop.index0] == current }}
+                   {{ 'struck' if cell.struck }} {{ 'wiped' if cell.reset }}">
+          {%- if cell.value is none -%}
+            <span class="empty">·</span>
+          {%- elif cell.reset -%}
+            0<small>vynulováno</small>
+          {%- else -%}
+            {{ cell.value|cislo }}
+          {%- endif -%}
+        </td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr>
+        <td class="label">1</td>
+        {% for name in game.names %}
+        <td class="{{ 'marked' if name == current }}"><span class="empty">·</span></td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="label">Celkem</td>
+        {% for name in game.names %}
+        <td class="{{ 'marked' if name == current }}">
+          {{ totals[name]|cislo }}
+          {%- if streaks[name] %} <span class="ticks">{{ '✕' * streaks[name] }}</span>{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+    </tfoot>
+  </table>
+</div>

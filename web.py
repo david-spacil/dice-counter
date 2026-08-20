@@ -1,0 +1,238 @@
+"""Webové počitadlo pro domácí síť.
+
+Telefon zapisuje skóre (`/game/<id>`), notebook ukazuje zápisník (`/board`).
+Server-rendered HTML, formuláře přes POST/redirect/GET, žádný build step.
+"""
+
+import os
+import socket
+
+import qrcode
+from flask import (Flask, abort, g, redirect, render_template, request,
+                   url_for)
+from markupsafe import Markup
+
+import storage
+from core import FINAL_SCORE, Game, GameOver
+
+app = Flask(__name__)
+
+PORT = int(os.environ.get("DICE_PORT", 8000))
+
+
+# --- připojení k databázi ---------------------------------------------------
+
+def db():
+    if "db" not in g:
+        g.db = storage.connect()
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_exception):
+    conn = g.pop("db", None)
+    if conn is not None:
+        conn.close()
+
+
+# --- adresa a QR kód --------------------------------------------------------
+
+def lan_address() -> str:
+    """Adresa, na kterou se dá z telefonu připojit.
+
+    IP notebooku se podle DHCP mění, proto ji hledáme za běhu. Připojení
+    UDP socketu nic neposílá, jen si vyžádá směrování k výchozí bráně.
+    """
+    host = os.environ.get("DICE_HOST")
+    if not host:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("10.255.255.255", 1))
+            host = sock.getsockname()[0]
+        except OSError:
+            host = socket.gethostbyname(socket.gethostname())
+        finally:
+            sock.close()
+    return f"http://{host}:{PORT}"
+
+
+def qr_svg(data: str) -> Markup:
+    """QR jako SVG složené ze čtverečků — bez Pillow a bez práce s obrázky."""
+    code = qrcode.QRCode(box_size=1, border=2)
+    code.add_data(data)
+    code.make(fit=True)
+    matrix = code.get_matrix()
+    size = len(matrix)
+
+    rects = [
+        f'<rect x="{x}" y="{y}" width="1" height="1"/>'
+        for y, row in enumerate(matrix)
+        for x, dark in enumerate(row) if dark
+    ]
+
+    return Markup(
+        f'<svg class="qr" viewBox="0 0 {size} {size}" role="img" '
+        f'aria-label="QR kód s adresou pro telefon" '
+        f'shape-rendering="crispEdges">{"".join(rects)}</svg>'
+    )
+
+
+@app.template_filter("cislo")
+def cislo(value: int) -> str:
+    """Tisíce se v češtině oddělují mezerou."""
+    return f"{value:,}".replace(",", " ")
+
+
+# --- zápisník ---------------------------------------------------------------
+
+def scoresheet(game: Game) -> list[dict]:
+    """Řádky zápisníku po kolech.
+
+    Tahy zapsané před posledním vynulováním se přeškrtnou — přesně tak, jak
+    by se škrtaly na papíře.
+    """
+    wiped_in_round = {}
+    for turn in game.turns:
+        if turn.reset:
+            wiped_in_round[turn.player] = turn.round
+
+    rows = []
+    for number, by_player in game.rounds():
+        cells = []
+        for name in game.names:
+            turn = by_player[name]
+            cells.append({
+                "value": None if turn is None else turn.value,
+                "reset": turn is not None and turn.reset,
+                "struck": turn is not None and turn.round < wiped_in_round.get(name, 0),
+            })
+        rows.append({"round": number, "cells": cells})
+
+    return rows
+
+
+def view(game: Game, game_id: int, row) -> dict:
+    """Společný podklad pro zápisník i pro zadávací pohled."""
+    totals = game.totals()
+    winner = row["winner_name"] if row["status"] == storage.STATUS_FINISHED else ""
+    return {
+        "game": game,
+        "game_id": game_id,
+        "row": row,
+        "totals": totals,
+        "rows": scoresheet(game),
+        "streaks": {name: game.zero_streak(name) for name in game.names},
+        "standings": game.standings(),
+        "winner": winner,
+        "current": "" if winner else game.current_player,
+    }
+
+
+def load(game_id: int) -> tuple[Game, "storage.sqlite3.Row"]:
+    row = storage.game_row(db(), game_id)
+    if row is None:
+        abort(404)
+    return storage.load_game(db(), game_id), row
+
+
+# --- routy ------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    return render_template(
+        "index.html",
+        players=storage.known_players(db()),
+        running=storage.running_game(db()),
+        final_score=FINAL_SCORE,
+    )
+
+
+@app.post("/game")
+def new_game():
+    names = [n for n in request.form.getlist("player") if n.strip()]
+    if not names:
+        return redirect(url_for("index", chyba="Vyber aspoň jednoho hráče."))
+
+    try:
+        final_score = int(request.form.get("final_score") or FINAL_SCORE)
+    except ValueError:
+        return redirect(url_for("index", chyba="Cílové skóre musí být číslo."))
+
+    try:
+        game_id = storage.create_game(db(), names, final_score)
+    except ValueError as exc:
+        return redirect(url_for("index", chyba=str(exc)))
+
+    return redirect(url_for("game_view", game_id=game_id))
+
+
+@app.route("/game/<int:game_id>")
+def game_view(game_id: int):
+    game, row = load(game_id)
+    return render_template("game.html", chyba=request.args.get("chyba", ""),
+                           **view(game, game_id, row))
+
+
+@app.post("/game/<int:game_id>/turn")
+def add_turn(game_id: int):
+    game, row = load(game_id)
+
+    try:
+        value = int(request.form.get("value", ""))
+    except ValueError:
+        return redirect(url_for("game_view", game_id=game_id,
+                                chyba="Zadej skóre jako číslo."))
+
+    try:
+        result = game.add_score(value)
+    except GameOver:
+        return redirect(url_for("game_view", game_id=game_id))
+
+    storage.add_turn(db(), game_id, result.turn)
+    if result.winner:
+        storage.finish_game(db(), game_id, result.winner)
+
+    return redirect(url_for("game_view", game_id=game_id))
+
+
+@app.post("/game/<int:game_id>/undo")
+def undo(game_id: int):
+    storage.undo_turn(db(), game_id)
+    return redirect(url_for("game_view", game_id=game_id))
+
+
+@app.post("/game/<int:game_id>/abandon")
+def abandon(game_id: int):
+    storage.abandon_game(db(), game_id)
+    return redirect(url_for("index"))
+
+
+@app.route("/board")
+def board_redirect():
+    game_id = storage.running_game(db())
+    if game_id:
+        return redirect(url_for("board", game_id=game_id))
+
+    return render_template("board_idle.html", address=lan_address(),
+                           qr=qr_svg(lan_address()))
+
+
+@app.route("/board/<int:game_id>")
+def board(game_id: int):
+    game, row = load(game_id)
+    address = lan_address() + url_for("game_view", game_id=game_id)
+    return render_template("board.html", address=address, qr=qr_svg(address),
+                           **view(game, game_id, row))
+
+
+@app.route("/board/<int:game_id>/panel")
+def board_panel(game_id: int):
+    """Fragment, na který se tabule doptává každé dvě vteřiny."""
+    game, row = load(game_id)
+    return render_template("_panel.html", **view(game, game_id, row))
+
+
+if __name__ == "__main__":
+    print(f"Počitadlo běží na {lan_address()}")
+    print(f"Tabule: {lan_address()}/board")
+    app.run(host="0.0.0.0", port=PORT, threaded=True)

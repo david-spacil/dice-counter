@@ -1,0 +1,3 @@
+<p class="eyebrow">Zápisník · hra {{ game_id }}</p>
+<h1>{% if winner %}Konec hry{% else %}Na tahu {{ current }}{% endif %}</h1>
+<p class="meta">do {{ game.final_score|cislo }} bodů · kolo {{ game.round_number }}</p>

@@ -1,0 +1,421 @@
+/* Počitadlo v kostkách.
+   Vizuálně stojí na tom, co nahrazuje: čtverečkovaný papír a dvě propisky —
+   modrá zapisuje, červená škrtá. Zvýrazňovač ukazuje, kdo je na tahu. */
+
+:root {
+  color-scheme: light;
+
+  --paper:     #FBFAF6;
+  --grid:      rgba(27, 59, 111, 0.06);
+  --rule:      #C3D0E2;
+  --ink:       #1B3B6F;
+  --ink-soft:  #6C7C9B;
+  --red:       #CB2B25;
+  --marker:    #FFE7A0;
+
+  --font-voice: Georgia, "Times New Roman", serif;
+  --font-ui:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num:   ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+
+  --step: 1.5rem;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: var(--step);
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+a { color: var(--ink); }
+
+/* --- hlavička ------------------------------------------------------------ */
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--step);
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 0.6rem;
+  margin-bottom: var(--step);
+}
+
+.masthead h1 {
+  font-family: var(--font-voice);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.2rem;
+}
+
+.meta {
+  font-family: var(--font-num);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* --- zápisník ------------------------------------------------------------ */
+
+.sheet-wrap { overflow-x: auto; }
+
+.sheet {
+  border-collapse: collapse;
+  width: 100%;
+  background: #FFFFFF;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet th,
+.sheet td {
+  border: 1px solid var(--rule);
+  padding: 0.7rem 1.2rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sheet thead th {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom-width: 2px;
+  border-bottom-color: var(--ink);
+}
+
+.sheet .label {
+  text-align: left;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  width: 1%;              /* sloupec s číslem kola se smrskne na obsah */
+  white-space: nowrap;
+}
+
+.sheet tbody td { font-size: 1.5rem; }
+
+.sheet .empty { color: var(--rule); }
+
+/* Zvýrazňovač na sloupci hráče, který je na tahu. Nerovnoměrný, jako tah fixem. */
+.marked {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 231, 160, 0.35) 0%,
+    rgba(255, 231, 160, 0.9) 18%,
+    rgba(255, 231, 160, 0.75) 82%,
+    rgba(255, 231, 160, 0.3) 100%
+  );
+}
+
+/* Škrtnuté zápisy před vynulováním. */
+.struck {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 2px;
+}
+
+.wiped { color: var(--red); }
+
+.wiped small {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sheet tfoot td {
+  border-top: 2px solid var(--ink);
+  font-size: 2.1rem;
+  font-weight: 700;
+  padding-top: 0.7rem;
+}
+
+.sheet tfoot .label { font-weight: 400; }
+
+/* --- nuly za sebou ------------------------------------------------------- */
+
+.ticks {
+  color: var(--red);
+  font-size: 0.9em;
+  letter-spacing: 0.15em;
+}
+
+.warning {
+  color: var(--red);
+  font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+}
+
+/* --- zadávací pohled ----------------------------------------------------- */
+
+.phone { max-width: 30rem; margin: 0 auto; }
+
+.turn {
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  padding: 1.2rem;
+  margin-bottom: var(--step);
+}
+
+.turn h2 {
+  font-family: var(--font-voice);
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 400;
+  margin: 0.1rem 0 0.4rem;
+  line-height: 1.05;
+}
+
+.progress {
+  font-family: var(--font-num);
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.progress strong { color: var(--ink); font-size: 1.35rem; }
+
+input[type="number"] {
+  width: 100%;
+  font-family: var(--font-num);
+  font-size: 1.6rem;
+  padding: 0.7rem 0.8rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+}
+
+input[type="text"] {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  padding: 0.7rem 0.8rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+}
+
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+}
+
+.field { margin-bottom: 0.8rem; }
+
+.field label {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.35rem;
+}
+
+button {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.btn {
+  width: 100%;
+  padding: 0.9rem;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.btn:hover { background: #16305c; }
+
+.btn-quiet {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  font-weight: 400;
+}
+
+.btn-quiet:hover { border-color: var(--ink); }
+
+.btn-danger { color: var(--red); border-color: var(--red); }
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: var(--step);
+}
+
+.actions form { flex: 1; }
+.actions button { width: 100%; padding: 0.75rem 0.5rem; }
+
+.standings {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.standings td { padding: 0.45rem 0; border-bottom: 1px solid var(--rule); }
+.standings td:last-child { text-align: right; font-weight: 600; }
+.standings .rank { color: var(--ink-soft); width: 2.5rem; }
+.standings .self { font-family: var(--font-ui); }
+
+.error {
+  border-left: 3px solid var(--red);
+  color: var(--red);
+  padding: 0.5rem 0.8rem;
+  margin-bottom: var(--step);
+  font-size: 0.9rem;
+}
+
+/* --- výběr hráčů --------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.chip {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--marker);
+  font-weight: 600;
+}
+
+.chip .seat {
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.chip[aria-pressed="true"] .seat { color: var(--ink); }
+
+.hint {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  margin: 0 0 var(--step);
+}
+
+.add-player { display: flex; gap: 0.5rem; }
+.add-player input { flex: 1; }
+.add-player button { padding: 0 1rem; border: 1px solid var(--ink); background: transparent; }
+
+.notice {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink);
+  padding: 0.8rem 1rem;
+  margin-bottom: var(--step);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* --- tabule -------------------------------------------------------------- */
+
+.board { max-width: 64rem; margin: 0 auto; }
+
+.join {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.join .address {
+  font-family: var(--font-num);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.join .address span {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.qr { width: 5.5rem; height: 5.5rem; fill: var(--ink); }
+
+.idle {
+  text-align: center;
+  padding-top: 12vh;
+}
+
+.idle .join { justify-content: center; margin-top: var(--step); }
+.idle .qr { width: 9rem; height: 9rem; }
+
+/* --- vyhlášení ----------------------------------------------------------- */
+
+.win {
+  border: 2px solid var(--ink);
+  padding: 1.4rem var(--step);
+  margin-bottom: var(--step);
+  background: var(--marker);
+}
+
+.win h2 {
+  font-family: var(--font-voice);
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 400;
+  margin: 0.2rem 0 0.4rem;
+}
+
+.win p { margin: 0; color: var(--ink-soft); }
+
+/* --- odkazy dole --------------------------------------------------------- */
+
+.footer {
+  margin-top: calc(var(--step) * 2);
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  display: flex;
+  gap: 1.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
