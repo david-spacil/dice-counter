@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Síň slávy{% endblock %}
+
+{% block body %}
+<div class="board">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Počitadlo</p>
+      <h1>Síň slávy</h1>
+    </div>
+    <p class="meta"><a href="{{ url_for('index') }}">Nová hra</a></p>
+  </header>
+
+  {% if records.best_turn %}
+  <div class="records">
+    <article class="record">
+      <p class="eyebrow">Nejvyšší tah</p>
+      <p class="number">{{ records.best_turn.value|cislo }}</p>
+      <p class="who">{{ records.best_turn.name }} · hra {{ records.best_turn.game_id }}
+        · {{ records.best_turn.at|datum }}</p>
+    </article>
+
+    {% if records.best_score %}
+    <article class="record">
+      <p class="eyebrow">Nejvyšší konečné skóre</p>
+      <p class="number">{{ records.best_score.total|cislo }}</p>
+      <p class="who">{{ records.best_score.name }} · hra {{ records.best_score.game_id }}
+        · {{ records.best_score.finished_at|datum }}</p>
+    </article>
+    {% endif %}
+
+    {% if records.fastest %}
+    <article class="record">
+      <p class="eyebrow">Nejrychlejší výhra</p>
+      <p class="number">{{ records.fastest.rounds }}<small> kol</small></p>
+      <p class="who">{{ records.fastest.name }} · hra {{ records.fastest.game_id }}
+        · {{ records.fastest.finished_at|datum }}</p>
+    </article>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="hint">Zatím se neodehrál ani jeden tah. Rekordy přibudou po první hře.</p>
+  {% endif %}
+
+  {% if careers %}
+  <p class="eyebrow">Kariéra</p>
+  <p class="hint">Počítají se jen dohrané hry.</p>
+  <div class="sheet-wrap">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th class="label">Hráč</th>
+          <th>Her</th>
+          <th>Výher</th>
+          <th>Úspěšnost</th>
+          <th>Průměrné pořadí</th>
+          <th>Průměr na tah</th>
+          <th>Vynulování</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for player in careers %}
+        <tr>
+          <td class="label name">{{ player.name }}</td>
+          <td>{{ player.games }}</td>
+          <td>{{ player.wins }}</td>
+          <td>{{ (player.share * 100)|round|int }} %</td>
+          <td>{{ '%.1f'|format(player.placing) }}</td>
+          <td>{{ player.per_turn|round|int|cislo }}</td>
+          <td class="{{ 'wiped' if player.wipeouts }}">{{ player.wipeouts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if games %}
+  <p class="eyebrow" style="margin-top: 2.5rem">Odehrané hry</p>
+  <div class="sheet-wrap">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th class="label">Hra</th>
+          <th class="label">Datum</th>
+          <th>Hráčů</th>
+          <th>Kol</th>
+          <th>Cíl</th>
+          <th class="label">Výsledek</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for game in games %}
+        <tr>
+          <td class="label">{{ game.id }}</td>
+          <td class="label">{{ game.started_at|datum }}</td>
+          <td>{{ game.players }}</td>
+          <td>{{ (game.turns / game.players)|round(0, 'ceil')|int }}</td>
+          <td>{{ game.final_score|cislo }}</td>
+          <td class="label name">
+            {%- if game.winner_name %}Vyhrává {{ game.winner_name }}
+            {%- elif game.status == 'probíhá' %}<a href="{{ url_for('game_view', game_id=game.id) }}">Pokračovat</a>
+            {%- else %}{{ game.status }}{% endif -%}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

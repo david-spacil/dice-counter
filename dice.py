@@ -1,30 +1,34 @@
-import sys
-from collections import Counter
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["tabulate"]
+# ///
+"""Počitadlo skóre v terminálu.
+
+Pravidla žijí v `core.Game`, tenhle modul je jen vstup a výstup. Hraje se
+v paměti, nic se neukládá — na historii je webová aplikace (`web.py`).
+"""
+
 from os import name, system
 
 from tabulate import tabulate
 
-hraci = {}
-score = {}
-pointer = ""
-first = ""
-final_score = 10000
+from core import FINAL_SCORE, Game
+
+table_header = ["Hráč", "Skóre"]
+
 
 def clear() -> None:
-    _ = system('cls') if name == 'nt' else system('clear') 
+    _ = system('cls') if name == 'nt' else system('clear')
 
-def char_create() -> bool:
-    global pointer
-    global first
-    global final_score
+
+def char_create() -> tuple[list[str], int]:
+    """Zeptá se na hráče a cílové skóre."""
+    hraci: list[str] = []
 
     while True:
         inp: str = input("Zadejte jméno prvního hráče: ")
         if inp:
-            hraci[inp] = []
-            score[inp] = 0
-            pointer = inp
-            first = inp
+            hraci.append(inp)
             clear()
             print(f"Hráč/ka {inp} přidán(a).")
             break
@@ -40,11 +44,12 @@ def char_create() -> bool:
                 print("Je potřeba zadávat unikátní jména.")
             else:
                 clear()
-                hraci[inp] = []
-                score[inp] = 0
+                hraci.append(inp)
                 print(f"Hráč/ka {inp} přidán(a).")
         else:
             break
+
+    final_score: int = FINAL_SCORE
 
     while True:
         inp = input("Zadejte finální skóre (nechte prázdné pro výchozích 10 000): ")
@@ -59,103 +64,39 @@ def char_create() -> bool:
         else:
             break
 
-    return True
+    return hraci, final_score
 
-def next_player() -> None:
-    global pointer
 
-    keys_iter = iter(hraci)
-    for key in keys_iter:
-        if key == pointer:
-            nxt_key = next(keys_iter, first)
-            break
-
-    pointer = nxt_key
-
-table_header = ["Hráč", "Skóre"]
-
-def table():
+def table(game: Game) -> str:
     hraci_tab = []
-    for h, h_val in score.items():
-        hrac = h
-        if pointer == h:
-            hrac = "> "+h
-        hraci_tab.append([hrac, h_val])
+    for hrac, hodnota in game.totals().items():
+        if game.current_player == hrac:
+            hrac = "> " + hrac
+        hraci_tab.append([hrac, hodnota])
 
     return tabulate(hraci_tab, headers=table_header, tablefmt="fancy_grid")
 
-def add_score(hrac, hodnota):
-    if hodnota == 0:
-        last_two = hraci[hrac][-2:]
-        if len(last_two) > 1:
-            last_two_sum = sum(last_two)
-            if last_two_sum == 0:
-                hodnota = -sum(hraci[hrac])
-                clear()
-                input("Po třech nulových hodech bylo vaše skóre vynulováno.")
 
-    hraci[hrac].append(hodnota)
-    score[hrac] = sum(hraci[hrac])
-
-def to_sorted_tuple(d: dict[str, int], s: bool = True) -> tuple[list[tuple[int, str, int]],
-                                                                dict[str, int]]:
-    L: list[tuple[int, str, int]] = []
-
-    if s:
-        d = dict(sorted(d.items(), key=lambda x: x[1], reverse=True)) 
-
-    for i, (k, v) in enumerate(d.items()):
-        L.append((i+1, k, v))
-
-    return L, d
-
-def check_win() -> str:
-    over_limit: dict[str, int] = {}
-    for p in score:
-        if score[p] >= final_score:
-            over_limit[p] = score[p]
-
-    winner: str = ""
-
-    if over_limit:
-        L, d = to_sorted_tuple(over_limit)
-
-        count: Counter = Counter(list(d.values()))
-
-        for c in count:
-            if count[c] == 1:
-                winner = L[0][1]
-            break
-
-    return winner
-
-def win(winner: str, vitezne_skore: int) -> None:
-    results, d = to_sorted_tuple(score)
-
+def win(game: Game, winner: str) -> None:
     headers = ["Pořadí", "Hráč", "Skóre"]
-    vysledky = tabulate(results, headers=headers, tablefmt="fancy_grid")
+    vysledky = tabulate(game.standings(), headers=headers, tablefmt="fancy_grid")
 
-    print(f"Vítězem se stává {winner} s {vitezne_skore} body!")
+    print(f"Vítězem se stává {winner} s {game.totals()[winner]} body!")
     print("Díky za hru a zase příště.\n")
 
     print(vysledky)
 
-def game():
+
+def play(game: Game) -> None:
     while True:
         clear()
-        print(table())
+        print(table(game))
 
-        strikes: str = ""
+        pointer = game.current_player
+        strikes: str = "x" * game.zero_streak(pointer)
 
-        if len(hraci[pointer]) > 0:
-            if hraci[pointer][-1] == 0:
-                strikes = "x"
-                if len(hraci[pointer]) > 1 and hraci[pointer][-2] == 0:
-                    strikes += "x"
-        else:
-            strikes = ""
-
-        inp = input(f"Zadejte skóre hráče {pointer} ({score[pointer]}{strikes}/{final_score}): ")
+        inp = input(f"Zadejte skóre hráče {pointer} "
+                    f"({game.totals()[pointer]}{strikes}/{game.final_score}): ")
         try:
             inp_int = int(inp)
         except ValueError:
@@ -163,30 +104,27 @@ def game():
             input("Zadejte prosím platnou číselnou hodnotu.")
             continue
 
-        add_score(pointer, inp_int)
-        next_player()
+        result = game.add_score(inp_int)
 
-        if pointer == first:
-            winner: str = check_win()
-            if winner:
-                clear()
-                win(winner, score[winner])
-                break
+        if result.was_reset:
+            clear()
+            input("Po třech nulových hodech bylo vaše skóre vynulováno.")
+
+        if result.winner:
+            clear()
+            win(game, result.winner)
+            break
 
 
 def main() -> None:
     clear()
-    if char_create():
-        clear()
-        print("Vytvoření hráči:", ", ".join(list(hraci.keys())))
-    else:
-        print("Nastala chyba při vytváření uživatelů.")
-        sys.exit()
+    hraci, final_score = char_create()
+    clear()
+    print("Vytvoření hráči:", ", ".join(hraci))
 
     input("Stiskněte libovolnou klávesu pro pokračování. ")
 
-    game()
-
+    play(Game(hraci, final_score))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{% if winner %}Konec hry{% else %}Na tahu {{ game.current_player }}{% endif %}{% endblock %}
+
+{% block body %}
+<div class="phone">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Hra {{ game_id }}</p>
+      <h1>Kostky</h1>
+    </div>
+    <p class="meta">do {{ game.final_score|cislo }} · kolo {{ game.round_number }}</p>
+  </header>
+
+  {% if chyba %}
+  <p class="error">{{ chyba }}</p>
+  {% endif %}
+
+  {% if winner %}
+  <div class="win">
+    <p class="eyebrow">Konec hry</p>
+    <h2>{{ winner }}</h2>
+    <p>Vyhrává s {{ totals[winner]|cislo }} body z cílových {{ game.final_score|cislo }}.</p>
+  </div>
+  {% else %}
+  <div class="turn">
+    <p class="eyebrow">Na tahu</p>
+    <h2>{{ game.current_player }}</h2>
+    <p class="progress">
+      <strong>{{ totals[game.current_player]|cislo }}</strong> / {{ game.final_score|cislo }}
+      {%- if streaks[game.current_player] %}
+      <span class="ticks">{{ '✕' * streaks[game.current_player] }}</span>
+      {%- endif %}
+    </p>
+    {% if streaks[game.current_player] == 2 %}
+    <p class="warning">Ještě jedna nula a skóre jde pryč.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('add_turn', game_id=game_id) }}" style="margin-top: 1.2rem">
+      <div class="field">
+        <label for="value">Skóre za tah</label>
+        <input type="number" name="value" id="value" inputmode="numeric" autofocus required>
+      </div>
+      <button class="btn" type="submit">Zapsat</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <p class="eyebrow">Průběžné pořadí</p>
+  <table class="standings">
+    {% for rank, name, total in standings %}
+    <tr>
+      <td class="rank">{{ rank }}.</td>
+      <td class="self">{{ name }}</td>
+      <td>
+        {{ total|cislo }}
+        {%- if streaks[name] %} <span class="ticks">{{ '✕' * streaks[name] }}</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div class="actions">
+    <form method="post" action="{{ url_for('undo', game_id=game_id) }}">
+      <button class="btn-quiet" type="submit" {{ 'disabled' if not game.turns }}>Vrátit poslední zápis</button>
+    </form>
+    {% if not winner %}
+    <form method="post" action="{{ url_for('abandon', game_id=game_id) }}">
+      <button class="btn-quiet btn-danger" type="submit">Ukončit hru</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <p class="footer">
+    <a href="{{ url_for('board', game_id=game_id) }}">Zápisník</a>
+    <a href="{{ url_for('hall') }}">Síň slávy</a>
+    <a href="{{ url_for('index') }}">Nová hra</a>
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,134 @@
+import pytest
+
+import storage
+
+
+@pytest.fixture
+def conn(tmp_path):
+    connection = storage.connect(tmp_path / "test.db")
+    yield connection
+    connection.close()
+
+
+def test_stejne_jmeno_je_stejny_hrac(conn):
+    """Arkádová identita: Adam z jedné hry je Adam i v další."""
+    first = storage.create_game(conn, ["Adam", "Eva"])
+    second = storage.create_game(conn, ["adam", "Petr"])
+
+    adam_first = [p["id"] for p in storage.seating(conn, first) if p["name"] == "Adam"]
+    adam_second = [p["id"] for p in storage.seating(conn, second)][0]
+
+    assert adam_first[0] == adam_second
+
+
+def test_normalizace_jmen():
+    assert storage.normalize("  Adam ") == storage.normalize("adam")
+    assert storage.normalize("Jan  Novák") == storage.normalize("jan novák")
+    assert storage.normalize("Adam") != storage.normalize("Ádám")
+
+
+def test_prejmenovani_se_propise_do_starych_her(conn):
+    game_id = storage.create_game(conn, ["Adam", "Eva"])
+    adam = storage.seating(conn, game_id)[0]["id"]
+
+    storage.rename_player(conn, adam, "Adam Š.")
+
+    assert [p["name"] for p in storage.seating(conn, game_id)] == ["Adam Š.", "Eva"]
+
+
+def test_slouceni_hracu_po_preklepu(conn):
+    good = storage.create_game(conn, ["Adam", "Eva"])
+    typo = storage.create_game(conn, ["Adm", "Eva"])
+
+    adam = storage.get_or_create_player(conn, "Adam")
+    adm = storage.get_or_create_player(conn, "Adm")
+
+    game = storage.load_game(conn, typo)
+    storage.add_turn(conn, typo, game.add_score(150).turn)
+
+    storage.merge_players(conn, adm, adam)
+
+    assert [p["name"] for p in storage.seating(conn, typo)] == ["Adam", "Eva"]
+    assert storage.load_game(conn, typo).totals()["Adam"] == 150
+    assert [p["id"] for p in storage.known_players(conn)].count(adm) == 0
+    assert storage.load_game(conn, good).totals() == {"Adam": 0, "Eva": 0}
+
+
+def test_hra_se_nacte_zpatky_i_s_tahy(conn):
+    game_id = storage.create_game(conn, ["Adam", "Eva"], final_score=500)
+    game = storage.load_game(conn, game_id)
+
+    for value in (100, 50, 0, 30):
+        storage.add_turn(conn, game_id, game.add_score(value).turn)
+
+    loaded = storage.load_game(conn, game_id)
+
+    assert loaded.names == ["Adam", "Eva"]
+    assert loaded.final_score == 500
+    assert loaded.totals() == {"Adam": 100, "Eva": 80}
+    assert loaded.current_player == "Adam"
+    assert loaded.round_number == 3
+
+
+def test_vynulovani_se_uklada_jako_nula_s_priznakem(conn):
+    game_id = storage.create_game(conn, ["Adam"], final_score=500)
+    game = storage.load_game(conn, game_id)
+
+    for value in (300, 0, 0, 0):
+        storage.add_turn(conn, game_id, game.add_score(value).turn)
+
+    rows = conn.execute("SELECT value, reset FROM turns ORDER BY id").fetchall()
+
+    assert [r["value"] for r in rows] == [300, 0, 0, 0]
+    assert [r["reset"] for r in rows] == [0, 0, 0, 1]
+    assert storage.load_game(conn, game_id).totals()["Adam"] == 0
+
+
+def test_rozehrana_hra_se_najde_a_dokonci(conn):
+    game_id = storage.create_game(conn, ["Adam", "Eva"], final_score=100)
+
+    assert storage.running_game(conn) == game_id
+
+    game = storage.load_game(conn, game_id)
+    storage.add_turn(conn, game_id, game.add_score(100).turn)
+    result = game.add_score(10)
+    storage.add_turn(conn, game_id, result.turn)
+    storage.finish_game(conn, game_id, result.winner)
+
+    assert storage.running_game(conn) is None
+    assert storage.game_row(conn, game_id)["status"] == storage.STATUS_FINISHED
+    assert storage.game_row(conn, game_id)["winner_name"] == "Adam"
+
+
+def test_undo_smaze_tah_a_vrati_hru_do_hry(conn):
+    game_id = storage.create_game(conn, ["Adam", "Eva"], final_score=100)
+    game = storage.load_game(conn, game_id)
+    storage.add_turn(conn, game_id, game.add_score(100).turn)
+    result = game.add_score(10)
+    storage.add_turn(conn, game_id, result.turn)
+    storage.finish_game(conn, game_id, result.winner)
+
+    assert storage.undo_turn(conn, game_id)
+
+    row = storage.game_row(conn, game_id)
+    assert row["status"] == storage.STATUS_RUNNING
+    assert row["winner_id"] is None
+    assert storage.load_game(conn, game_id).current_player == "Eva"
+
+
+def test_opustena_hra(conn):
+    game_id = storage.create_game(conn, ["Adam", "Eva"])
+    storage.abandon_game(conn, game_id)
+
+    assert storage.running_game(conn) is None
+    assert storage.game_row(conn, game_id)["status"] == storage.STATUS_ABANDONED
+
+
+def test_hrac_nesmi_sedet_u_stolu_dvakrat(conn):
+    with pytest.raises(ValueError):
+        storage.create_game(conn, ["Adam", "adam"])
+
+
+def test_prazdne_jmeno(conn):
+    with pytest.raises(ValueError):
+        storage.get_or_create_player(conn, "   ")

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Nová hra{% endblock %}
+
+{% block body %}
+<div class="phone">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Počitadlo</p>
+      <h1>Kostky</h1>
+    </div>
+  </header>
+
+  {% if request.args.get('chyba') %}
+  <p class="error">{{ request.args.get('chyba') }}</p>
+  {% endif %}
+
+  {% if running %}
+  <div class="notice">
+    <span>Rozehraná hra {{ running }} čeká.</span>
+    <a href="{{ url_for('game_view', game_id=running) }}">Pokračovat</a>
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('new_game') }}">
+    <p class="eyebrow">Kdo hraje</p>
+    <p class="hint">Ťukej jména v pořadí, jak sedíte kolem stolu.</p>
+
+    <div class="chips" id="chips">
+      {% for player in players %}
+      <button type="button" class="chip" aria-pressed="false" data-name="{{ player.name }}">
+        {{ player.name }}<span class="seat"></span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="add-player">
+      <input type="text" id="new-name" placeholder="Nový hráč" autocomplete="off">
+      <button type="button" id="add">Přidat</button>
+    </div>
+
+    <div class="field" style="margin-top: 1.5rem">
+      <label for="final">Cílové skóre</label>
+      <input type="number" name="final_score" id="final" value="{{ final_score }}" inputmode="numeric">
+    </div>
+
+    <div id="chosen"></div>
+    <button class="btn" type="submit">Začít hru</button>
+  </form>
+
+  <p class="footer">
+    <a href="{{ url_for('board_redirect') }}">Zápisník</a>
+    <a href="{{ url_for('hall') }}">Síň slávy</a>
+  </p>
+</div>
+
+<script>
+  const chips = document.getElementById("chips");
+  const chosen = [];
+
+  function render() {
+    for (const chip of chips.querySelectorAll(".chip")) {
+      const seat = chosen.indexOf(chip.dataset.name);
+      chip.setAttribute("aria-pressed", seat > -1);
+      chip.querySelector(".seat").textContent = seat > -1 ? seat + 1 : "";
+    }
+
+    // Pořadí odeslaných polí je pořadí u stolu.
+    document.getElementById("chosen").replaceChildren(...chosen.map(name => {
+      const field = document.createElement("input");
+      field.type = "hidden";
+      field.name = "player";
+      field.value = name;
+      return field;
+    }));
+  }
+
+  chips.addEventListener("click", event => {
+    const chip = event.target.closest(".chip");
+    if (!chip) return;
+
+    const seat = chosen.indexOf(chip.dataset.name);
+    if (seat > -1) chosen.splice(seat, 1);
+    else chosen.push(chip.dataset.name);
+    render();
+  });
+
+  const field = document.getElementById("new-name");
+
+  function addPlayer() {
+    const name = field.value.trim();
+    if (!name) return;
+
+    if (!chips.querySelector(`[data-name="${CSS.escape(name)}"]`)) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.dataset.name = name;
+      chip.append(name, Object.assign(document.createElement("span"), { className: "seat" }));
+      chips.append(chip);
+    }
+
+    if (!chosen.includes(name)) chosen.push(name);
+    field.value = "";
+    render();
+  }
+
+  document.getElementById("add").addEventListener("click", addPlayer);
+  field.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); addPlayer(); }
+  });
+</script>
+{% endblock %}
