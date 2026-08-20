@@ -20,6 +20,10 @@ app = Flask(__name__)
 
 PORT = int(os.environ.get("DICE_PORT", 8000))
 
+# Kolik kol tabule ukáže. Zbytek historie je na hráčích, ne na tabuli —
+# ta má ukazovat stav, ne archiv.
+BOARD_ROUNDS = 15
+
 
 # --- připojení k databázi ---------------------------------------------------
 
@@ -87,6 +91,15 @@ def datum(value: str) -> str:
     return f"{int(den[2])}. {int(den[1])}. {den[0]}"
 
 
+@app.template_filter("kola")
+def kola(count: int) -> str:
+    if count == 1:
+        return "1 kolo"
+    if 2 <= count <= 4:
+        return f"{count} kola"
+    return f"{count} kol"
+
+
 @app.template_filter("cislo")
 def cislo(value: int) -> str:
     """Tisíce se v češtině oddělují mezerou."""
@@ -95,8 +108,11 @@ def cislo(value: int) -> str:
 
 # --- zápisník ---------------------------------------------------------------
 
-def scoresheet(game: Game) -> list[dict]:
-    """Řádky zápisníku po kolech.
+def scoresheet(game: Game) -> tuple[list[dict], int]:
+    """Řádky zápisníku po kolech, od nejnovějšího.
+
+    Naposledy odehrané kolo patří nahoru — po padesáti kolech by jinak bylo
+    to podstatné mimo obrazovku. Vrací i počet kol, která se nevešla.
 
     Tahy zapsané před posledním vynulováním se přeškrtnou — přesně tak, jak
     by se škrtaly na papíře.
@@ -118,19 +134,24 @@ def scoresheet(game: Game) -> list[dict]:
             })
         rows.append({"round": number, "cells": cells})
 
-    return rows
+    rows.reverse()
+    hidden = max(0, len(rows) - BOARD_ROUNDS)
+
+    return rows[:BOARD_ROUNDS], hidden
 
 
 def view(game: Game, game_id: int, row) -> dict:
     """Společný podklad pro zápisník i pro zadávací pohled."""
     totals = game.totals()
     winner = row["winner_name"] if row["status"] == storage.STATUS_FINISHED else ""
+    rows, hidden = scoresheet(game)
     return {
         "game": game,
         "game_id": game_id,
         "row": row,
         "totals": totals,
-        "rows": scoresheet(game),
+        "rows": rows,
+        "hidden": hidden,
         "streaks": {name: game.zero_streak(name) for name in game.names},
         "standings": game.standings(),
         "winner": winner,

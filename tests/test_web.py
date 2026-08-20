@@ -191,3 +191,48 @@ def test_sin_slavy(client):
 
 def test_sin_slavy_bez_her(client):
     assert "Rekordy přibudou po první hře" in text(client.get("/stats"))
+
+
+def test_zapisnik_zacina_nejnovejsim_kolem(client):
+    game_id = start_game(client, "Adam", final_score=99999)
+    for value in (111, 222, 333):
+        score(client, game_id, value)
+
+    panel = text(client.get(f"/board/{game_id}/panel"))
+
+    assert panel.index("333") < panel.index("222") < panel.index("111")
+
+
+def test_soucty_jsou_nad_koly(client):
+    game_id = start_game(client, "Adam", final_score=99999)
+    score(client, game_id, 450)
+
+    panel = text(client.get(f"/board/{game_id}/panel"))
+
+    assert panel.index("Celkem") < panel.index(">450<")
+
+
+def test_tabule_useka_starou_historii(client):
+    game_id = start_game(client, "Adam", final_score=999999)
+    for value in range(1, 31):
+        score(client, game_id, value * 10)
+
+    panel = text(client.get(f"/board/{game_id}/panel"))
+
+    assert "a dalších 15 kol" in panel
+    assert "300" in panel        # nejnovější kolo tam je
+    assert ">150<" not in panel  # patnácté odspodu už ne
+
+
+def test_kratka_hra_nic_neuseka(client):
+    game_id = start_game(client, "Adam", final_score=99999)
+    score(client, game_id, 100)
+
+    assert "a dalších" not in text(client.get(f"/board/{game_id}/panel"))
+
+
+@pytest.mark.parametrize("count, expected", [
+    (1, "1 kolo"), (2, "2 kola"), (4, "4 kola"), (5, "5 kol"), (22, "22 kol"),
+])
+def test_sklonovani_kol(count, expected):
+    assert web.kola(count) == expected

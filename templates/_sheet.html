@@ -16,6 +16,20 @@
         {% endfor %}
       </tr>
     </thead>
+
+    {# Součty patří nahoru: po padesáti kolech by je jinak nikdo neviděl. #}
+    <tbody class="totals">
+      <tr>
+        <td class="label">Celkem</td>
+        {% for name in game.names %}
+        <td class="{{ 'marked' if name == current }}">
+          {{ totals[name]|cislo }}
+          {%- if streaks[name] %} <span class="ticks">{{ '✕' * streaks[name] }}</span>{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+    </tbody>
+
     <tbody>
       {% for row in rows %}
       <tr>
@@ -41,17 +55,12 @@
         {% endfor %}
       </tr>
       {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td class="label">Celkem</td>
-        {% for name in game.names %}
-        <td class="{{ 'marked' if name == current }}">
-          {{ totals[name]|cislo }}
-          {%- if streaks[name] %} <span class="ticks">{{ '✕' * streaks[name] }}</span>{% endif %}
-        </td>
-        {% endfor %}
+
+      {% if hidden %}
+      <tr class="more">
+        <td class="label" colspan="{{ game.names|length + 1 }}">… a dalších {{ hidden|kola }}</td>
       </tr>
-    </tfoot>
+      {% endif %}
+    </tbody>
   </table>
 </div>
