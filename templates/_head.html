@@ -1,3 +1,5 @@
+{# data-address si hlídá tabule: když se notebook přesune na jinou síť,
+   je v QR kódu stará adresa a stránka se sama načte znovu. #}
 <p class="eyebrow">Zápisník · hra {{ game_id }}</p>
 <h1>{% if winner %}Konec hry{% else %}Na tahu {{ current }}{% endif %}</h1>
 <p class="meta">do {{ game.final_score|cislo }} bodů · kolo {{ game.round_number }}</p>

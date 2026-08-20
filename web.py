@@ -12,6 +12,7 @@ from flask import (Flask, abort, g, redirect, render_template, request,
                    url_for)
 from markupsafe import Markup
 
+import net
 import stats
 import storage
 from core import FINAL_SCORE, Game, GameOver
@@ -42,23 +43,27 @@ def close_db(_exception):
 
 # --- adresa a QR kód --------------------------------------------------------
 
-def lan_address() -> str:
-    """Adresa, na kterou se dá z telefonu připojit.
+def primary_ip() -> str:
+    """Adresa, na kterou tabule ukazuje. Prázdno, když se nedá zjistit."""
+    found = net.addresses()
+    return found[0].ip if found else ""
 
-    IP notebooku se podle DHCP mění, proto ji hledáme za běhu. Připojení
-    UDP socketu nic neposílá, jen si vyžádá směrování k výchozí bráně.
+
+def links(path: str = "/") -> dict:
+    """Adresy, na kterých je počitadlo dostupné, i s cílem pro QR kód.
+
+    Hledá se při každém načtení — notebook se během večera může přesunout
+    z domácí WiFi na hotspot a zpátky.
     """
-    host = os.environ.get("DICE_HOST")
-    if not host:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sock.connect(("10.255.255.255", 1))
-            host = sock.getsockname()[0]
-        except OSError:
-            host = socket.gethostbyname(socket.gethostname())
-        finally:
-            sock.close()
-    return f"http://{host}:{PORT}"
+    found = net.addresses()
+    primary = found[0] if found else None
+
+    return {
+        "primary": primary,
+        "others": found[1:],
+        "port": PORT,
+        "target": primary.url(PORT) + path if primary else "",
+    }
 
 
 def qr_svg(data: str) -> Markup:
@@ -89,6 +94,11 @@ def datum(value: str) -> str:
         return ""
     den = value[:10].split("-")
     return f"{int(den[2])}. {int(den[1])}. {den[0]}"
+
+
+@app.template_filter("qr")
+def qr_filter(data: str) -> Markup:
+    return qr_svg(data) if data else Markup("")
 
 
 @app.template_filter("kola")
@@ -156,6 +166,7 @@ def view(game: Game, game_id: int, row) -> dict:
         "standings": game.standings(),
         "winner": winner,
         "current": "" if winner else game.current_player,
+        "primary_ip": primary_ip(),
     }
 
 
@@ -244,15 +255,14 @@ def board_redirect():
     if game_id:
         return redirect(url_for("board", game_id=game_id))
 
-    return render_template("board_idle.html", address=lan_address(),
-                           qr=qr_svg(lan_address()))
+    return render_template("board_idle.html", **links(url_for("index")))
 
 
 @app.route("/board/<int:game_id>")
 def board(game_id: int):
     game, row = load(game_id)
-    address = lan_address() + url_for("game_view", game_id=game_id)
-    return render_template("board.html", address=address, qr=qr_svg(address),
+    return render_template("board.html",
+                           **links(url_for("game_view", game_id=game_id)),
                            **view(game, game_id, row))
 
 
@@ -273,6 +283,15 @@ def hall():
 
 
 if __name__ == "__main__":
-    print(f"Počitadlo běží na {lan_address()}")
-    print(f"Tabule: {lan_address()}/board")
+    found = net.addresses()
+
+    if found:
+        print("Počitadlo je dostupné na:")
+        for address in found:
+            mark = "→" if address.primary else " "
+            print(f" {mark} {address.url(PORT):30} {address.label}")
+        print(f"\nTabule na notebook: {found[0].url(PORT)}/board")
+    else:
+        print("Adresu se nepodařilo zjistit. Spusť server s DICE_HOST=<adresa>.")
+
     app.run(host="0.0.0.0", port=PORT, threaded=True)

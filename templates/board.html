@@ -4,11 +4,8 @@
 {% block body %}
 <div class="board">
   <header class="masthead">
-    <div id="head">{% include "_head.html" %}</div>
-    <div class="join">
-      {{ qr }}
-      <p class="address"><span>Zapisuje se z telefonu</span>{{ address }}</p>
-    </div>
+    <div id="head" data-address="{{ primary_ip }}">{% include "_head.html" %}</div>
+    {% include "_join.html" %}
   </header>
 
   <div id="sheet">{% include "_sheet.html" %}</div>
@@ -16,7 +13,6 @@
 
 <script>
   // Tabule se doptává serveru; není co udržovat na klientovi.
-  // QR kód a adresa se needitují, takže zůstávají mimo obnovovanou část.
   const url = "{{ url_for('board_panel', game_id=game_id) }}";
 
   setInterval(async () => {
@@ -25,6 +21,14 @@
       if (!response.ok) return;
 
       const fresh = new DOMParser().parseFromString(await response.text(), "text/html");
+
+      // Notebook se přesunul na jinou síť — adresa v QR kódu už neplatí.
+      const head = fresh.getElementById("head");
+      if (head && head.dataset.address !== document.getElementById("head").dataset.address) {
+        location.reload();
+        return;
+      }
+
       for (const id of ["head", "sheet"]) {
         const updated = fresh.getElementById(id);
         if (updated) document.getElementById(id).replaceWith(updated);

@@ -1,0 +1,22 @@
+{# Kudy se na počitadlo dostane telefon. Nabídneme víc cest, vybrat si může člověk. #}
+{% if primary %}
+<div class="join">
+  {{ target|qr }}
+  <div class="address">
+    <span>Zapisuje se z telefonu</span>
+    {{ target }}
+    {% if others %}
+    <ul class="alt">
+      {% for address in others %}
+      <li>{{ address.ip }}:{{ port }} <em>{{ address.label }}</em></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="join">
+  <p class="address"><span>Adresu se nepodařilo zjistit</span>
+    Spusť server s <code>DICE_HOST=&lt;adresa&gt;</code>.</p>
+</div>
+{% endif %}

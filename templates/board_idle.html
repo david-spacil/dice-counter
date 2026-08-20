@@ -6,9 +6,6 @@
   <p class="eyebrow">Zápisník</p>
   <h1>Zatím se nehraje</h1>
   <p class="hint">Naskenuj kód telefonem a založ hru.</p>
-  <div class="join">
-    {{ qr }}
-    <p class="address"><span>Adresa počitadla</span>{{ address }}</p>
-  </div>
+  {% include "_join.html" %}
 </div>
 {% endblock %}
