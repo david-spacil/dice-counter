@@ -47,7 +47,10 @@
     <button class="btn" type="submit">Začít hru</button>
   </form>
 
-  <p class="footer"><a href="{{ url_for('board_redirect') }}">Zápisník</a></p>
+  <p class="footer">
+    <a href="{{ url_for('board_redirect') }}">Zápisník</a>
+    <a href="{{ url_for('hall') }}">Síň slávy</a>
+  </p>
 </div>
 
 <script>

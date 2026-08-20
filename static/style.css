@@ -419,3 +419,45 @@ button {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* --- síň slávy ----------------------------------------------------------- */
+
+.records {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.record {
+  background: #FFFFFF;
+  padding: 1.2rem 1.4rem;
+}
+
+.record .number {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.6rem;
+  margin: 0.2rem 0 0.3rem;
+  line-height: 1;
+}
+
+.record .number small {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.record .who {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.sheet .name {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--ink);
+}

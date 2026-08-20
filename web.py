@@ -12,6 +12,7 @@ from flask import (Flask, abort, g, redirect, render_template, request,
                    url_for)
 from markupsafe import Markup
 
+import stats
 import storage
 from core import FINAL_SCORE, Game, GameOver
 
@@ -75,6 +76,15 @@ def qr_svg(data: str) -> Markup:
         f'aria-label="QR kód s adresou pro telefon" '
         f'shape-rendering="crispEdges">{"".join(rects)}</svg>'
     )
+
+
+@app.template_filter("datum")
+def datum(value: str) -> str:
+    """Z ISO textu udělá 12. 8. 2026."""
+    if not value:
+        return ""
+    den = value[:10].split("-")
+    return f"{int(den[2])}. {int(den[1])}. {den[0]}"
 
 
 @app.template_filter("cislo")
@@ -230,6 +240,15 @@ def board_panel(game_id: int):
     """Fragment, na který se tabule doptává každé dvě vteřiny."""
     game, row = load(game_id)
     return render_template("_panel.html", **view(game, game_id, row))
+
+
+@app.route("/stats")
+def hall():
+    conn = db()
+    return render_template("stats.html",
+                           records=stats.records(conn),
+                           careers=stats.careers(conn),
+                           games=storage.recent_games(conn))
 
 
 if __name__ == "__main__":

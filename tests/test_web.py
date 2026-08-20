@@ -175,3 +175,19 @@ def test_tabule_presmeruje_na_rozehranou_hru(client):
 
 def test_neexistujici_hra(client):
     assert client.get("/game/999").status_code == 404
+
+
+def test_sin_slavy(client):
+    game_id = start_game(client, "Adam", "Eva", final_score=500)
+    score(client, game_id, 500)
+    score(client, game_id, 100)
+
+    page = text(client.get("/stats"))
+
+    assert "Nejvyšší tah" in page
+    assert "Kariéra" in page
+    assert "Vyhrává Adam" in page
+
+
+def test_sin_slavy_bez_her(client):
+    assert "Rekordy přibudou po první hře" in text(client.get("/stats"))
