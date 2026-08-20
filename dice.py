@@ -148,9 +148,9 @@ def game():
         strikes: str = ""
 
         if len(hraci[pointer]) > 0:
-            if hraci[pointer][-1:][0] == 0:
+            if hraci[pointer][-1] == 0:
                 strikes = "x"
-                if hraci[pointer][-2:][0] == 0:
+                if len(hraci[pointer]) > 1 and hraci[pointer][-2] == 0:
                     strikes += "x"
         else:
             strikes = ""
