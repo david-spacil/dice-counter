@@ -96,13 +96,20 @@ jobs:
                   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
           fi
 
-          # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
-          curl -s -H "$auth" "$api/releases/$id/assets" \
-              | python3 -c 'import json,os,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == os.environ["ASSET"]]' \
-              | while read -r old; do
-              curl -sf -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
-          done
+          # Součet se počítá nad jménem, pod kterým se soubor stahuje, aby
+          # šel ověřit rovnou: sha256sum -c kostky-linux-x86_64.sha256
+          cp dist/kostky "$ASSET"
+          sha256sum "$ASSET" | tee "$ASSET.sha256"
 
-          curl -sf -o /dev/null -X POST -H "$auth" -F "attachment=@dist/kostky" \
-              "$api/releases/$id/assets?name=${ASSET}"
-          echo "$ASSET pověšen na ${GITHUB_REF_NAME}"
+          for file in "$ASSET" "$ASSET.sha256"; do
+              # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
+              curl -s -H "$auth" "$api/releases/$id/assets" \
+                  | python3 -c 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == sys.argv[1]]' "$file" \
+                  | while read -r old; do
+                  curl -sf -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
+              done
+
+              curl -sf -o /dev/null -X POST -H "$auth" -F "attachment=@$file" \
+                  "$api/releases/$id/assets?name=$file"
+              echo "$file pověšen na ${GITHUB_REF_NAME}"
+          done
