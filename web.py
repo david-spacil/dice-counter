@@ -10,6 +10,8 @@ Server-rendered HTML, formuláře přes POST/redirect/GET, žádný build step.
 
 import os
 import socket
+import sys
+from pathlib import Path
 
 import qrcode
 from flask import (Flask, abort, g, redirect, render_template, request,
@@ -21,7 +23,19 @@ import stats
 import storage
 from core import FINAL_SCORE, Game, GameOver
 
-app = Flask(__name__)
+def bundled(folder: str) -> str:
+    """Cesta k šablonám a stylům.
+
+    Ze zdrojáků leží vedle tohoto souboru. V binárce je PyInstaller rozbalí
+    do dočasného adresáře, na který ukazuje `sys._MEIPASS`.
+    """
+    root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+    return str(root / folder)
+
+
+app = Flask(__name__,
+            template_folder=bundled("templates"),
+            static_folder=bundled("static"))
 
 PORT = int(os.environ.get("DICE_PORT", 8000))
 
@@ -297,5 +311,7 @@ if __name__ == "__main__":
         print(f"\nTabule na notebook: {found[0].url(PORT)}/board")
     else:
         print("Adresu se nepodařilo zjistit. Spusť server s DICE_HOST=<adresa>.")
+
+    print(f"\nDatabáze: {storage.DB_PATH.resolve()}")
 
     app.run(host="0.0.0.0", port=PORT, threaded=True)
