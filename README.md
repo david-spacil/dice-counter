@@ -156,3 +156,7 @@ uv run --with-requirements requirements.txt --no-project pytest
 ```
 
 Nebo z připraveného prostředí prostě `pytest`.
+
+Nad každým pull requestem a nad `main` běží `.gitea/workflows/testy.yml` —
+84 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
+v terminálové verzi, na kterou pytest nesahá.
