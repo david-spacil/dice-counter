@@ -16,7 +16,7 @@ from pathlib import Path
 import qrcode
 from flask import (Flask, abort, g, redirect, render_template, request,
                    url_for)
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 import net
 import stats
@@ -61,31 +61,50 @@ def close_db(_exception):
 
 # --- adresa a QR kód --------------------------------------------------------
 
-def primary_ip() -> str:
-    """Adresa, na kterou tabule ukazuje. Prázdno, když se nedá zjistit."""
-    found = net.addresses()
-    return found[0].ip if found else ""
+def address_key() -> str:
+    """Otisk všech adres. Tabule ho hlídá: jakmile se změní, načte se znovu,
+    protože nabídnuté adresy i QR kódy už neplatí."""
+    return ",".join(address.ip for address in net.addresses())
 
 
 def links(path: str = "/") -> dict:
-    """Adresy, na kterých je počitadlo dostupné, i s cílem pro QR kód.
+    """Adresy, na kterých je počitadlo dostupné, i s cíli pro QR kódy.
 
     Hledá se při každém načtení — notebook se během večera může přesunout
-    z domácí WiFi na hotspot a zpátky.
+    z domácí WiFi na hotspot a zpátky. První v pořadí je ta nejnadějnější,
+    zbytek si člověk může na tabuli přepnout.
     """
-    found = net.addresses()
-    primary = found[0] if found else None
-
     return {
-        "primary": primary,
-        "others": found[1:],
+        "choices": [
+            {"ip": address.ip, "label": address.label,
+             "url": address.url(PORT) + path}
+            for address in net.addresses()
+        ],
         "port": PORT,
-        "target": primary.url(PORT) + path if primary else "",
     }
 
 
+def runs(row: list[bool]) -> list[tuple[int, int]]:
+    """Souvislé tmavé úseky řádku jako (začátek, délka).
+
+    Jeden široký obdélník místo řady čtverečků. Na tabuli visí QR kód pro
+    každou adresu zvlášť, takže se to na velikosti stránky pozná.
+    """
+    found = []
+    start = None
+
+    for x, dark in enumerate([*row, False]):
+        if dark and start is None:
+            start = x
+        elif not dark and start is not None:
+            found.append((start, x - start))
+            start = None
+
+    return found
+
+
 def qr_svg(data: str) -> Markup:
-    """QR jako SVG složené ze čtverečků — bez Pillow a bez práce s obrázky."""
+    """QR jako SVG složené z obdélníků — bez Pillow a bez práce s obrázky."""
     code = qrcode.QRCode(box_size=1, border=2)
     code.add_data(data)
     code.make(fit=True)
@@ -93,14 +112,14 @@ def qr_svg(data: str) -> Markup:
     size = len(matrix)
 
     rects = [
-        f'<rect x="{x}" y="{y}" width="1" height="1"/>'
+        f'<rect x="{x}" y="{y}" width="{width}" height="1"/>'
         for y, row in enumerate(matrix)
-        for x, dark in enumerate(row) if dark
+        for x, width in runs(row)
     ]
 
     return Markup(
         f'<svg class="qr" viewBox="0 0 {size} {size}" role="img" '
-        f'aria-label="QR kód s adresou pro telefon" '
+        f'aria-label="QR kód s adresou {escape(data)}" '
         f'shape-rendering="crispEdges">{"".join(rects)}</svg>'
     )
 
@@ -184,7 +203,7 @@ def view(game: Game, game_id: int, row) -> dict:
         "standings": game.standings(),
         "winner": winner,
         "current": "" if winner else game.current_player,
-        "primary_ip": primary_ip(),
+        "address_key": address_key(),
     }
 
 
