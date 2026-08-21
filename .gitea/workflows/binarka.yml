@@ -1,0 +1,108 @@
+# Postaví binárku a pověsí ji na release.
+#
+# Runner běží v host módu, takže tu není kontejner ani hotové akce
+# z marketplace — nic se nespoléhá na to, co má hostitel nainstalováno.
+# O starou glibc se stará build.sh přes samostatný CPython od uv.
+name: binárka
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: homelab
+
+    steps:
+      - name: objdump
+        run: |
+          # Jediné, co musí být na hostiteli — PyInstaller jím hledá, na
+          # kterých knihovnách binárka visí. Zbytek si obstará uv.
+          command -v objdump >/dev/null && exit 0
+          sudo=""; [ "$(id -u)" -ne 0 ] && sudo=sudo
+          if command -v apt-get >/dev/null; then
+              $sudo apt-get update -qq
+              $sudo apt-get install -y -qq binutils
+          elif command -v dnf >/dev/null; then
+              $sudo dnf install -y -q binutils
+          else
+              echo "Nainstaluj binutils, PyInstaller bez objdumpu nestaví." >&2
+              exit 1
+          fi
+
+      - name: Zdrojáky
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q .
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git config http.extraheader "Authorization: token ${TOKEN}"
+          git fetch -q --depth 1 origin "${GITHUB_REF}"
+          git config --unset http.extraheader
+          git checkout -qf FETCH_HEAD
+          git clean -qfd
+
+      - name: uv
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv --version
+
+      - name: Testy
+        run: uv run --with-requirements requirements.txt --no-project pytest -q
+
+      - name: Binárka
+        run: ./build.sh
+
+      - name: Zkouška
+        run: |
+          XDG_DATA_HOME=/tmp/zkouska DICE_PORT=8321 DICE_HOST=127.0.0.1 \
+              ./dist/kostky > /tmp/server.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+
+          for _ in $(seq 30); do
+              curl -sf -o /dev/null http://127.0.0.1:8321/ && break
+              sleep 1
+          done
+
+          curl -sf -o /dev/null http://127.0.0.1:8321/
+          curl -sf -o /dev/null http://127.0.0.1:8321/static/style.css
+          curl -sf -o /dev/null http://127.0.0.1:8321/board
+          test -f /tmp/zkouska/kostky/dice.db
+          cat /tmp/server.log
+
+      - name: Na release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET: kostky-linux-x86_64
+        run: |
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          auth="Authorization: token ${TOKEN}"
+
+          # Release u tagu být může, ale nemusí — dá se založit i ručně.
+          id=$(curl -s -H "$auth" "$api/releases/tags/${GITHUB_REF_NAME}" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+
+          if [ -z "$id" ]; then
+              id=$(curl -sf -X POST -H "$auth" -H "Content-Type: application/json" \
+                  -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\"}" \
+                  "$api/releases" \
+                  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          fi
+
+          # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
+          curl -s -H "$auth" "$api/releases/$id/assets" \
+              | python3 -c 'import json,os,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == os.environ["ASSET"]]' \
+              | while read -r old; do
+              curl -sf -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
+          done
+
+          curl -sf -o /dev/null -X POST -H "$auth" -F "attachment=@dist/kostky" \
+              "$api/releases/$id/assets?name=${ASSET}"
+          echo "$ASSET pověšen na ${GITHUB_REF_NAME}"

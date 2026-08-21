@@ -10,12 +10,30 @@ Součty se nikde neukládají; stav hry se rekonstruuje načtením tahů do
 import os
 import re
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
 from core import FINAL_SCORE, Game, Turn
 
-DB_PATH = Path(os.environ.get("DICE_DB", "dice.db"))
+def default_db() -> Path:
+    """Kam se ukládá databáze.
+
+    Ze zdrojáků do pracovního adresáře — dá se tak mít víc rozehraných
+    sad vedle sebe a je vidět, s čím se pracuje. Z binárky do datového
+    adresáře podle XDG: binárka se spouští odkudkoli a rozbaluje se do
+    dočasného adresáře, takže relativní cesta by databázi rozsypala po disku.
+    """
+    chosen = os.environ.get("DICE_DB")
+    if chosen:
+        return Path(chosen)
+    if getattr(sys, "frozen", False):
+        share = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+        return Path(share) / "kostky" / "dice.db"
+    return Path("dice.db")
+
+
+DB_PATH = default_db()
 
 STATUS_RUNNING = "probíhá"
 STATUS_FINISHED = "dohráno"
@@ -60,7 +78,9 @@ CREATE INDEX IF NOT EXISTS turns_game ON turns(game_id, id);
 
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(path or DB_PATH)
+    target = Path(path or DB_PATH)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(target)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)

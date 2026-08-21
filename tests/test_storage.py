@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 import storage
@@ -132,3 +134,34 @@ def test_hrac_nesmi_sedet_u_stolu_dvakrat(conn):
 def test_prazdne_jmeno(conn):
     with pytest.raises(ValueError):
         storage.get_or_create_player(conn, "   ")
+
+
+def test_umisteni_databaze_ze_zdrojaku(monkeypatch):
+    """Ze zdrojáků se ukládá do pracovního adresáře."""
+    monkeypatch.delenv("DICE_DB", raising=False)
+    monkeypatch.delattr(storage.sys, "frozen", raising=False)
+
+    assert storage.default_db() == Path("dice.db")
+
+
+def test_umisteni_databaze_z_binarky(monkeypatch, tmp_path):
+    """Binárka se rozbaluje do dočasného adresáře, databáze tam nesmí."""
+    monkeypatch.delenv("DICE_DB", raising=False)
+    monkeypatch.setattr(storage.sys, "frozen", True, raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    assert storage.default_db() == tmp_path / "kostky" / "dice.db"
+
+
+def test_dice_db_prebije_oboje(monkeypatch, tmp_path):
+    monkeypatch.setattr(storage.sys, "frozen", True, raising=False)
+    monkeypatch.setenv("DICE_DB", str(tmp_path / "jinde.db"))
+
+    assert storage.default_db() == tmp_path / "jinde.db"
+
+
+def test_connect_zalozi_chybejici_adresar(tmp_path):
+    conn = storage.connect(tmp_path / "novy" / "adresar" / "dice.db")
+    conn.close()
+
+    assert (tmp_path / "novy" / "adresar" / "dice.db").exists()
