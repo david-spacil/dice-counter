@@ -373,7 +373,7 @@ button {
   line-height: 1.4;
 }
 
-.join .address span {
+.join .address .what {
   display: block;
   font-family: var(--font-ui);
   font-size: 0.7rem;
@@ -381,6 +381,8 @@ button {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
+
+.join .address .url { display: block; }
 
 .qr { width: 5.5rem; height: 5.5rem; fill: var(--ink); }
 
@@ -479,6 +481,24 @@ button {
 }
 
 .alt li { white-space: nowrap; }
+
+/* Adresa je tlačítko, ale nemá vypadat jako tlačítko — jen dát najevo,
+   že se na ni dá kliknout. */
+.alt button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--rule);
+  padding: 0;
+  cursor: pointer;
+}
+
+.alt button:hover,
+.alt button:focus-visible {
+  color: var(--ink);
+  border-bottom-color: currentColor;
+}
 
 .alt em {
   font-family: var(--font-ui);

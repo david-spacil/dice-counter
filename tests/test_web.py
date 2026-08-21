@@ -1,5 +1,8 @@
+import re
+
 import pytest
 
+import net
 import storage
 import web
 
@@ -236,3 +239,90 @@ def test_kratka_hra_nic_neuseka(client):
 ])
 def test_sklonovani_kol(count, expected):
     assert web.kola(count) == expected
+
+
+def offer(monkeypatch, *ips):
+    """Server nabídne přesně tyhle adresy, v tomhle pořadí."""
+    found = [net.Address(ip=ip, interface="test", kind="lan", primary=not i)
+             for i, ip in enumerate(ips)]
+    monkeypatch.setattr(web.net, "addresses", lambda: found)
+
+
+def test_tabule_nabidne_qr_ke_kazde_adrese(client, monkeypatch):
+    """Kódy jsou vykreslené předem, přepíná se jen ten viditelný."""
+    offer(monkeypatch, "192.168.0.10", "100.91.0.24", "172.17.0.1")
+    game_id = start_game(client, "Adam", "Eva")
+
+    page = text(client.get(f"/board/{game_id}"))
+
+    assert page.count('<svg class="qr"') == 3
+    for ip in ("192.168.0.10", "100.91.0.24", "172.17.0.1"):
+        assert f'data-url="http://{ip}:8000/game/{game_id}"' in page
+
+
+def test_vybrana_adresa_ze_seznamu_zmizi(client, monkeypatch):
+    """Velkým písmem i v seznamu zároveň by byla dvakrát."""
+    offer(monkeypatch, "192.168.0.10", "100.91.0.24")
+
+    page = text(client.get("/board"))
+
+    assert '<li data-ip="192.168.0.10" hidden>' in page
+    assert '<li data-ip="100.91.0.24">' in page
+
+
+def test_jedina_adresa_nema_co_prepinat(client, monkeypatch):
+    offer(monkeypatch, "192.168.0.10")
+
+    page = text(client.get("/board"))
+
+    assert '<ul class="alt">' not in page
+    assert page.count('<svg class="qr"') == 1
+
+
+def test_otisk_hlida_vsechny_adresy(client, monkeypatch):
+    """Tabule se načte znovu i když se změní jen ta druhá v pořadí —
+    nabídnuté QR kódy už by neplatily."""
+    game_id = start_game(client, "Adam", "Eva")
+
+    offer(monkeypatch, "192.168.0.10", "100.91.0.24")
+    before = text(client.get(f"/board/{game_id}"))
+
+    offer(monkeypatch, "192.168.0.10", "100.91.0.99")
+    after = text(client.get(f"/board/{game_id}"))
+
+    assert 'data-address="192.168.0.10,100.91.0.24"' in before
+    assert 'data-address="192.168.0.10,100.91.0.99"' in after
+
+
+@pytest.mark.parametrize("row, expected", [
+    ([], []),
+    ([False, False], []),
+    ([True], [(0, 1)]),
+    ([True, True], [(0, 2)]),
+    ([False, True, True], [(1, 2)]),
+    ([True, True, False, True], [(0, 2), (3, 1)]),
+])
+def test_souvisle_useky(row, expected):
+    assert web.runs(row) == expected
+
+
+def test_qr_obdelniky_kryji_stejne_moduly():
+    """Slučování čtverečků do širších obdélníků nesmí kód změnit."""
+    import qrcode
+
+    data = "http://192.168.0.10:8000/"
+    code = qrcode.QRCode(box_size=1, border=2)
+    code.add_data(data)
+    code.make(fit=True)
+    matrix = code.get_matrix()
+
+    svg = str(web.qr_svg(data))
+    painted = set()
+    for x, y, width in re.findall(r'<rect x="(\d+)" y="(\d+)" width="(\d+)"', svg):
+        painted.update((int(x) + step, int(y)) for step in range(int(width)))
+
+    expected = {(x, y) for y, row in enumerate(matrix)
+                for x, dark in enumerate(row) if dark}
+
+    assert painted == expected
+    assert svg.count("<rect") < len(expected)

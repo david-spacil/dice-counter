@@ -37,8 +37,8 @@ Počitadlo je dostupné na:
 ```
 
 Na notebooku otevři `/board`, naskenuj QR kód telefonem a hraj. Tabule
-zobrazuje i zbylé adresy — když jedna nefunguje, zkus další. Zastavuje se
-`Ctrl+C`.
+nabízí i zbylé adresy — když jedna nefunguje, klikni na jinou a QR kód se
+přepne na ni. Zastavuje se `Ctrl+C`.
 
 | Proměnná | K čemu je | Výchozí |
 |---|---|---|

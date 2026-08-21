@@ -1,22 +1,58 @@
-{# Kudy se na počitadlo dostane telefon. Nabídneme víc cest, vybrat si může člověk. #}
-{% if primary %}
+{# Kudy se na počitadlo dostane telefon. Nabídneme víc cest, vybrat si může
+   člověk — QR kódy jsou vykreslené všechny, přepíná se jen ten viditelný. #}
+{% if choices %}
 <div class="join">
-  {{ target|qr }}
+  <div class="qr-stack">
+    {% for choice in choices %}
+    <div class="qr-slot" data-ip="{{ choice.ip }}"{% if not loop.first %} hidden{% endif %}>
+      {{ choice.url|qr }}
+    </div>
+    {% endfor %}
+  </div>
+
   <div class="address">
-    <span>Zapisuje se z telefonu</span>
-    {{ target }}
-    {% if others %}
+    <span class="what">Zapisuje se z telefonu</span>
+    <span class="url">{{ choices[0].url }}</span>
+
+    {% if choices|length > 1 %}
     <ul class="alt">
-      {% for address in others %}
-      <li>{{ address.ip }}:{{ port }} <em>{{ address.label }}</em></li>
+      {% for choice in choices %}
+      <li data-ip="{{ choice.ip }}"{% if loop.first %} hidden{% endif %}>
+        <button type="button" data-ip="{{ choice.ip }}" data-url="{{ choice.url }}"
+                aria-label="Ukázat QR kód pro {{ choice.url }}">
+          {{ choice.ip }}:{{ port }} <em>{{ choice.label }}</em>
+        </button>
+      </li>
       {% endfor %}
     </ul>
     {% endif %}
   </div>
 </div>
+
+<script>
+  // Klik na jinou adresu jen prohodí, který QR kód a který řádek je vidět.
+  // Vybraná adresa ze seznamu zmizí a ta předchozí se v něm objeví, takže
+  // se dá kroužit dokola.
+  {
+    const join = document.currentScript.previousElementSibling;
+    const shown = join.querySelector(".address .url");
+
+    for (const button of join.querySelectorAll(".alt button")) {
+      button.addEventListener("click", () => {
+        for (const slot of join.querySelectorAll(".qr-slot")) {
+          slot.hidden = slot.dataset.ip !== button.dataset.ip;
+        }
+        for (const item of join.querySelectorAll(".alt li")) {
+          item.hidden = item.dataset.ip === button.dataset.ip;
+        }
+        shown.textContent = button.dataset.url;
+      });
+    }
+  }
+</script>
 {% else %}
 <div class="join">
-  <p class="address"><span>Adresu se nepodařilo zjistit</span>
+  <p class="address"><span class="what">Adresu se nepodařilo zjistit</span>
     Spusť server s <code>DICE_HOST=&lt;adresa&gt;</code>.</p>
 </div>
 {% endif %}
