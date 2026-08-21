@@ -147,6 +147,13 @@ ji nastartovat a pověsí ji na release jako `kostky-linux-x86_64`:
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
+Vedle binárky se věší i `kostky-linux-x86_64.sha256`, takže se stažený
+soubor dá ověřit:
+
+```bash
+sha256sum -c kostky-linux-x86_64.sha256
+```
+
 Stejná stavba běží i nad každým pull requestem, jen se nikam nevěší.
 
 ## Testy
