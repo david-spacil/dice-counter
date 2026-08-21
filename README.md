@@ -8,12 +8,25 @@ ten samý Adam jako z minulého měsíce. Žádné účty, žádná hesla.
 
 ## Spuštění
 
+Stáhni binárku z [releases](https://gitea.spacilovi.eu/david-spacil/dice-counter/releases)
+a spusť ji:
+
+```bash
+chmod +x kostky
+./kostky
+```
+
+Nic se neinstaluje — Python, Flask i šablony jsou uvnitř. Zatím jen pro Linux
+na x86-64; postavené proti glibc 2.28, takže jede na všem od RHEL 8,
+Debianu 10 a Ubuntu 20.04 výš.
+
+Ze zdrojáků to je stejně krátké:
+
 ```bash
 uv run web.py
 ```
 
-To je celé. Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará
-sám — není co instalovat ani aktivovat.
+Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará sám.
 
 Server vypíše všechny adresy, na kterých je dostupný:
 
@@ -25,13 +38,32 @@ Počitadlo je dostupné na:
 ```
 
 Na notebooku otevři `/board`, naskenuj QR kód telefonem a hraj. Tabule
-zobrazuje i zbylé adresy — když jedna nefunguje, zkus další.
+zobrazuje i zbylé adresy — když jedna nefunguje, zkus další. Zastavuje se
+`Ctrl+C`.
 
 | Proměnná | K čemu je | Výchozí |
 |---|---|---|
-| `DICE_DB` | soubor s databází | `dice.db` |
+| `DICE_DB` | soubor s databází | podle způsobu spuštění, viz níž |
 | `DICE_PORT` | port | `8000` |
 | `DICE_HOST` | pevná adresa; vypne hledání | hledá se za běhu |
+
+## Kde jsou data
+
+Jeden soubor SQLite. Založí se sám při prvním načtení stránky, cestu k němu
+server vypíše při startu.
+
+| Spuštěno | Databáze |
+|---|---|
+| binárkou | `~/.local/share/kostky/dice.db` |
+| ze zdrojáků | `dice.db` v pracovním adresáři |
+
+Binárka se při každém spuštění rozbaluje do dočasného adresáře a pouští se
+odkudkoli, takže relativní cesta by databázi rozsypala po disku — proto
+napevno domovský adresář. Ze zdrojáků zůstává relativní, ať se dá mít víc
+sad vedle sebe.
+
+Zálohovat i stěhovat jde prostým zkopírováním souboru; `DICE_DB` si ho
+najde kdekoli.
 
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
@@ -69,6 +101,7 @@ při remíze na prvním místě se hraje dál.
 | `stats.py` | síň slávy a kariérní statistiky |
 | `web.py` | Flask aplikace |
 | `dice.py` | totéž v terminálu, bez ukládání |
+| `build.sh`, `kostky.spec` | stavba binárky |
 
 Terminálová verze zůstává funkční jako záloha:
 
@@ -92,6 +125,19 @@ Na Fedoře stačí i systémové balíčky, pak se nemusí řešit vůbec nic:
 sudo dnf install python3-flask python3-qrcode python3-tabulate
 python3 web.py
 ```
+
+## Vlastní binárka
+
+```bash
+./build.sh
+```
+
+Staví se v kontejneru (podman nebo docker) na AlmaLinux 8, ne na hostiteli.
+Binárka slinkovaná proti glibc z Fedory 44 by nešla spustit nikde se starším
+systémem — glibc drží zpětnou kompatibilitu, ne dopřednou. Výsledek je
+v `dist/kostky`.
+
+Terminálová verze součástí binárky není; ta se pouští ze zdrojáků.
 
 ## Testy
 
