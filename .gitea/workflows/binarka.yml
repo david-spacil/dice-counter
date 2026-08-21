@@ -1,0 +1,93 @@
+# Postaví binárku a pověsí ji na release.
+#
+# Běží v kontejneru na AlmaLinux 8, ne na runneru: binárka slinkovaná proti
+# novější glibc by nešla spustit na starších systémech. Záměrně bez hotových
+# akcí z marketplace — na vlastním runneru odpadá starost, jestli v kontejneru
+# je node.
+name: binárka
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: homelab
+    container: almalinux:8
+
+    steps:
+      - name: Nástroje
+        run: dnf install -y -q git python3.11 binutils
+
+      - name: Zdrojáky
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git config http.extraheader "Authorization: token ${TOKEN}"
+          git fetch -q --depth 1 origin "${GITHUB_REF}"
+          git checkout -q FETCH_HEAD
+          git config --unset http.extraheader
+
+      - name: Prostředí
+        run: |
+          python3.11 -m venv /tmp/build
+          /tmp/build/bin/pip install --quiet --upgrade pip
+          /tmp/build/bin/pip install --quiet -r requirements.txt pyinstaller
+
+      - name: Testy
+        run: /tmp/build/bin/pytest -q
+
+      - name: Binárka
+        run: |
+          /tmp/build/bin/pyinstaller --clean --noconfirm \
+              --distpath dist --workpath /tmp/work kostky.spec
+          ls -lh dist/kostky
+
+      - name: Zkouška
+        run: |
+          XDG_DATA_HOME=/tmp/data DICE_PORT=8321 DICE_HOST=127.0.0.1 \
+              ./dist/kostky > /tmp/server.log 2>&1 &
+          for _ in $(seq 30); do
+              curl -sf -o /dev/null http://127.0.0.1:8321/ && break
+              sleep 1
+          done
+          curl -sf -o /dev/null http://127.0.0.1:8321/
+          curl -sf -o /dev/null http://127.0.0.1:8321/static/style.css
+          curl -sf -o /dev/null http://127.0.0.1:8321/board
+          test -f /tmp/data/kostky/dice.db
+          cat /tmp/server.log
+
+      - name: Na release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET: kostky-linux-x86_64
+        run: |
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          auth="Authorization: token ${TOKEN}"
+
+          # Release může, ale nemusí existovat — na tag se dá kliknout ručně.
+          release=$(curl -s -H "$auth" "$api/releases/tags/${GITHUB_REF_NAME}")
+          id=$(printf '%s' "$release" | python3.11 -c \
+              'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+
+          if [ -z "$id" ]; then
+              id=$(curl -sf -X POST -H "$auth" -H "Content-Type: application/json" \
+                  -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\"}" \
+                  "$api/releases" | python3.11 -c \
+                  'import json,sys; print(json.load(sys.stdin)["id"])')
+          fi
+
+          # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
+          curl -s -H "$auth" "$api/releases/$id/assets" | python3.11 -c \
+              'import json,os,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == os.environ["ASSET"]]' \
+              | while read -r old; do
+              curl -sf -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
+          done
+
+          curl -sf -X POST -H "$auth" -F "attachment=@dist/kostky" \
+              "$api/releases/$id/assets?name=${ASSET}"

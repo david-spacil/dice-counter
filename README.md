@@ -139,6 +139,16 @@ v `dist/kostky`.
 
 Terminálová verze součástí binárky není; ta se pouští ze zdrojáků.
 
+Releasy si tohle dělají samy. Otagovaný commit spustí
+`.gitea/workflows/binarka.yml`, ta binárku postaví, projede testy, zkusí
+ji nastartovat a pověsí ji na release jako `kostky-linux-x86_64`:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Stejná stavba běží i nad každým pull requestem, jen se nikam nevěší.
+
 ## Testy
 
 ```bash
