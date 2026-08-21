@@ -1,4 +1,4 @@
-# Počitadlo v kostkách
+# Dice Counter
 
 Doprovod k fyzickým kostkám: **telefon zapisuje skóre, notebook ukazuje
 zápisník** a hry se pamatují mezi večery.
