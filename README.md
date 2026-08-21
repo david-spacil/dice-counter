@@ -17,8 +17,7 @@ chmod +x kostky
 ```
 
 Nic se neinstaluje — Python, Flask i šablony jsou uvnitř. Zatím jen pro Linux
-na x86-64; postavené proti glibc 2.28, takže jede na všem od RHEL 8,
-Debianu 10 a Ubuntu 20.04 výš.
+na x86-64; postavené proti glibc 2.17, takže jede prakticky všude.
 
 Ze zdrojáků to je stejně krátké:
 
@@ -132,10 +131,11 @@ python3 web.py
 ./build.sh
 ```
 
-Staví se v kontejneru (podman nebo docker) na AlmaLinux 8, ne na hostiteli.
-Binárka slinkovaná proti glibc z Fedory 44 by nešla spustit nikde se starším
-systémem — glibc drží zpětnou kompatibilitu, ne dopřednou. Výsledek je
-v `dist/kostky`.
+Staví se proti samostatnému CPythonu od `uv`, ne proti systémovému. Ten je
+slinkovaný s glibc 2.17; postavené proti Pythonu z Fedory 44 by to chtělo
+glibc 2.43 a nešlo by spustit skoro nikde — glibc drží zpětnou kompatibilitu,
+ne dopřednou. Nic z hostitele se do binárky nedostane, takže kontejner k tomu
+potřeba není. Výsledek je v `dist/kostky`.
 
 Terminálová verze součástí binárky není; ta se pouští ze zdrojáků.
 
