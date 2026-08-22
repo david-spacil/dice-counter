@@ -326,3 +326,36 @@ def test_qr_obdelniky_kryji_stejne_moduly():
 
     assert painted == expected
     assert svg.count("<rect") < len(expected)
+
+
+# --- záloha -----------------------------------------------------------------
+
+def test_export_vrati_pouzitelnou_databazi(client, tmp_path):
+    """Ze staženého souboru musí jít data přečíst zpátky, ne jen že se stáhne."""
+    game_id = start_game(client, "Adam", "Eva")
+    score(client, game_id, 150)
+
+    response = client.get("/export")
+
+    assert response.status_code == 200
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert response.headers["Content-Disposition"].endswith(".db")
+
+    stazeny = tmp_path / "stazeny.db"
+    stazeny.write_bytes(response.data)
+
+    conn = storage.connect(stazeny)
+    try:
+        assert [p["name"] for p in storage.seating(conn, game_id)] == ["Adam", "Eva"]
+        assert storage.load_game(conn, game_id).totals()["Adam"] == 150
+    finally:
+        conn.close()
+
+
+def test_export_zabere_i_rozehranou_hru(client):
+    """Kopie se dělá za běhu, uprostřed nedohrané hry."""
+    game_id = start_game(client, "Adam")
+    score(client, game_id, 100)
+
+    assert client.get("/export").status_code == 200
+    assert text(client.get("/stats")).count("Stáhnout databázi") == 1

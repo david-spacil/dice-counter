@@ -99,7 +99,9 @@ napevno domovský adresář. Ze zdrojáků zůstává relativní, ať se dá mí
 sad vedle sebe.
 
 Zálohovat i stěhovat jde prostým zkopírováním souboru; `DICE_DB` si ho
-najde kdekoli.
+najde kdekoli. Kdo ho hledat nechce — a z binárky na Windows je zalezlý —
+si ho stáhne ze síně slávy odkazem **Stáhnout databázi** (`/export`). Kopie
+se dělá přes `VACUUM INTO`, takže je použitelná i uprostřed rozehrané hry.
 
 Schéma má verzi uloženou v `PRAGMA user_version` a `storage.migrate()` si
 databázi při každém připojení dorovná. Starší soubory z verzí, kdy se verze

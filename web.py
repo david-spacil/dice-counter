@@ -8,14 +8,18 @@ Telefon zapisuje skóre (`/game/<id>`), notebook ukazuje zápisník (`/board`).
 Server-rendered HTML, formuláře přes POST/redirect/GET, žádný build step.
 """
 
+import io
 import os
+import shutil
 import socket
 import sys
+import tempfile
+from datetime import date
 from pathlib import Path
 
 import qrcode
 from flask import (Flask, abort, g, redirect, render_template, request,
-                   url_for)
+                   send_file, url_for)
 from markupsafe import Markup, escape
 from waitress import serve
 
@@ -317,6 +321,36 @@ def board_panel(game_id: int):
     """Fragment, na který se tabule doptává každé dvě vteřiny."""
     game, row = load(game_id)
     return render_template("_panel.html", **view(game, game_id, row))
+
+
+@app.route("/export")
+def export():
+    """Databáze ke stažení.
+
+    Dokud se hrálo ze zdrojáků, ležel `dice.db` v pracovním adresáři a záloha
+    byla otázka zkopírování. Z binárky se schovává do systémového datového
+    adresáře, který na Windows běžný člověk nenajde — tak ať se dá stáhnout
+    přes prohlížeč.
+
+    `VACUUM INTO` udělá konzistentní kopii i uprostřed zápisu, na rozdíl od
+    prostého přečtení souboru. Výsledek si přečteme do paměti a kopii hned
+    zahodíme: databáze počitadla se počítá v kilobajtech a takhle nezůstane
+    ležet v dočasném adresáři, když si ji někdo nestáhne celou.
+    """
+    conn = db()
+    conn.commit()                       # VACUUM nesmí běžet v transakci
+
+    docasny = tempfile.mkdtemp()
+    try:
+        kopie = Path(docasny) / "dice.db"
+        conn.execute("VACUUM INTO ?", (str(kopie),))
+        data = kopie.read_bytes()
+    finally:
+        shutil.rmtree(docasny, ignore_errors=True)
+
+    return send_file(io.BytesIO(data), mimetype="application/vnd.sqlite3",
+                     as_attachment=True,
+                     download_name=f"kostky-{date.today().isoformat()}.db")
 
 
 @app.route("/stats")

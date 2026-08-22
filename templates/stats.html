@@ -8,7 +8,8 @@
       <p class="eyebrow">Počitadlo</p>
       <h1>Síň slávy</h1>
     </div>
-    <p class="meta"><a href="{{ url_for('index') }}">Nová hra</a></p>
+    <p class="meta"><a href="{{ url_for('index') }}">Nová hra</a>
+      · <a href="{{ url_for('export') }}">Stáhnout databázi</a></p>
   </header>
 
   {% if records.best_turn %}
