@@ -11,7 +11,9 @@ adresy a obecný typ rozhraní, ne to, co má kdo zrovna nainstalované.
 
 import ipaddress
 import os
+import re
 import socket
+import subprocess
 from dataclasses import dataclass
 
 # Rozsah, ze kterého adresy přiděluje Tailscale (RFC 6598, CGNAT).
@@ -123,8 +125,45 @@ def _from_interfaces() -> list[tuple[str, str]]:
     return found
 
 
+def parse_ifconfig(text: str) -> list[tuple[str, str]]:
+    """Rozhraní a jejich IPv4 adresy z výstupu `ifconfig`.
+
+    Oddělená čistá funkce, ať se dá otestovat i bez macOS pod rukama.
+    """
+    found = []
+    name = ""
+
+    for line in text.splitlines():
+        head = re.match(r"(\S+):", line)
+        if head:
+            name = head.group(1)
+            continue
+
+        addr = re.search(r"\binet (\d+\.\d+\.\d+\.\d+)", line)
+        if addr:
+            found.append((name, addr.group(1)))
+
+    return found
+
+
+def _from_ifconfig() -> list[tuple[str, str]]:
+    """Adresy přes `ifconfig`. Záloha pro macOS, kde ioctl výše nesedí.
+
+    Spouští se jen tam, kde předchozí cesta nic nenašla, takže na Linuxu
+    se neplatí nic. Trvá jednotky milisekund, cachovat to nemá cenu.
+    """
+    try:
+        done = subprocess.run(["ifconfig", "-a"], capture_output=True,
+                              text=True, timeout=5, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    return parse_ifconfig(done.stdout)
+
+
 def _from_hostname() -> list[tuple[str, str]]:
-    """Záloha pro systémy, kde předchozí cesta nefunguje."""
+    """Poslední záloha. Na Windows vrátí adresy všech rozhraní, jinde
+    obvykle jen jednu — jména rozhraní se takhle nedozvíme."""
     try:
         infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
     except OSError:
@@ -144,7 +183,7 @@ def addresses() -> list[Address]:
 
     primary = default_route_address()
 
-    found = _from_interfaces() or _from_hostname()
+    found = _from_interfaces() or _from_ifconfig() or _from_hostname()
     if primary and primary not in [ip for _name, ip in found]:
         found.append(("", primary))
 
