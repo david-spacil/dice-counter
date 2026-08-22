@@ -8,16 +8,45 @@ ten samý Adam jako z minulého měsíce. Žádné účty, žádná hesla.
 
 ## Spuštění
 
-Stáhni binárku z [releases](https://gitea.spacilovi.eu/david-spacil/dice-counter/releases)
-a spusť ji:
+Stáhni binárku pro svůj systém z
+[releases](https://gitea.spacilovi.eu/david-spacil/dice-counter/releases):
+
+| Systém | Soubor |
+|---|---|
+| Linux (x86-64) | `kostky-linux-x86_64` |
+| macOS (Apple Silicon) | `kostky-macos-arm64` |
+| macOS (Intel) | `kostky-macos-x86_64` |
+| Windows (x86-64) | `kostky-windows-x86_64.exe` |
+
+Nic se neinstaluje — Python, Flask i šablony jsou uvnitř.
+
+Na Linuxu a macOS:
 
 ```bash
-chmod +x kostky
-./kostky
+chmod +x kostky-*
+./kostky-linux-x86_64
 ```
 
-Nic se neinstaluje — Python, Flask i šablony jsou uvnitř. Zatím jen pro Linux
-na x86-64; postavené proti glibc 2.17, takže jede prakticky všude.
+Na Windows stačí na `.exe` poklepat.
+
+Linuxová binárka je postavená proti glibc 2.17, takže jede prakticky všude.
+
+### Než to poprvé pustíš
+
+Binárky nejsou podepsané — podpisové certifikáty stojí tisíce ročně a na
+počitadlo kostek by to byl nesmysl. Systémy si toho všimnou:
+
+- **macOS** stažený soubor označí za karanténní a odmítne ho spustit. Buď
+  značku sundej (`xattr -dr com.apple.quarantine kostky-macos-arm64`), nebo
+  soubor stáhni rovnou z terminálu přes `curl -LO` — tudy se karanténa
+  nenastavuje.
+- **Windows** ukáže modré okno SmartScreenu. *Další informace* →
+  *Přesto spustit*. Občas si postěžuje i antivirus; u zabalených Python
+  programů je to běžný falešný poplach. Při prvním spuštění se ještě zeptá
+  brána firewall — bez povolení do místní sítě se telefon nepřipojí.
+
+Kdo tomu nechce věřit, ověří si stažený soubor podle přiloženého součtu
+(níž) nebo si ho postaví sám — `./build.sh`, zdrojáky jsou tady celé.
 
 Ze zdrojáků to je stejně krátké:
 
@@ -53,7 +82,9 @@ server vypíše při startu.
 
 | Spuštěno | Databáze |
 |---|---|
-| binárkou | `~/.local/share/kostky/dice.db` |
+| binárkou na Linuxu | `~/.local/share/kostky/dice.db` |
+| binárkou na macOS | `~/Library/Application Support/kostky/dice.db` |
+| binárkou na Windows | `%LOCALAPPDATA%\kostky\dice.db` |
 | ze zdrojáků | `dice.db` v pracovním adresáři |
 
 Binárka se při každém spuštění rozbaluje do dočasného adresáře a pouští se
@@ -101,6 +132,8 @@ při remíze na prvním místě se hraje dál.
 | `web.py` | Flask aplikace |
 | `dice.py` | totéž v terminálu, bez ukládání |
 | `build.sh`, `kostky.spec` | stavba binárky |
+| `.gitea/workflows/` | testy a linuxová binárka doma |
+| `.github/workflows/` | binárky pro Windows a macOS |
 
 Terminálová verze zůstává funkční jako záloha:
 
@@ -135,26 +168,44 @@ Staví se proti samostatnému CPythonu od `uv`, ne proti systémovému. Ten je
 slinkovaný s glibc 2.17; postavené proti Pythonu z Fedory 44 by to chtělo
 glibc 2.43 a nešlo by spustit skoro nikde — glibc drží zpětnou kompatibilitu,
 ne dopřednou. Nic z hostitele se do binárky nedostane, takže kontejner k tomu
-potřeba není. Výsledek je v `dist/kostky`.
+potřeba není. Výsledek je v `dist/`.
+
+Stejný `build.sh` staví i na macOS a na Windows (v Git Bash) — jen tam bez
+té starosti o glibc. Křížem to nejde: PyInstaller balí do výsledku interpret
+a knihovny toho systému, na kterém běží, takže **binárku pro každý systém
+musí postavit ten systém.**
 
 Terminálová verze součástí binárky není; ta se pouští ze zdrojáků.
 
-Releasy si tohle dělají samy. Otagovaný commit spustí
-`.gitea/workflows/binarka.yml`, ta binárku postaví, projede testy, zkusí
-ji nastartovat a pověsí ji na release jako `kostky-linux-x86_64`:
+### Jak vznikají releasy
+
+Otagovaný commit spustí stavbu na obou stranách:
+
+| Kde | Co staví | Workflow |
+|---|---|---|
+| vlastní runner u Gitey | Linux | `.gitea/workflows/binarka.yml` |
+| GitHub Actions | Windows, macOS ×2 | `.github/workflows/binarky.yml` |
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-Vedle binárky se věší i `kostky-linux-x86_64.sha256`, takže se stažený
-soubor dá ověřit:
+GitHub je tu jen půjčená dílna. Repozitář se tam z Gitey zrcadlí
+([mirror](https://github.com/david-spacil/dice-counter)), postavené soubory
+se posílají zpátky na zdejší release přes Gitea API a projekt má pořád jednu
+stránku s releasy — tuhle. Linux se na GitHubu schválně nestaví; doma to jde
+proti staré glibc, a když GitHub vypadne, release má aspoň tu platformu,
+na které to reálně poběží.
+
+Každá stavba nejdřív projede testy a zkusí hotovou binárku nastartovat, než
+ji kamkoli pověsí. Vedle každé visí i `.sha256`, takže se stažený soubor dá
+ověřit:
 
 ```bash
-sha256sum -c kostky-linux-x86_64.sha256
+sha256sum -c kostky-linux-x86_64.sha256     # na macOS: shasum -a 256 -c
 ```
 
-Stejná stavba běží i nad každým pull requestem, jen se nikam nevěší.
+Nad pull requesty se Linux staví taky, jen se nikam nevěší.
 
 ## Testy
 
@@ -165,5 +216,5 @@ uv run --with-requirements requirements.txt --no-project pytest
 Nebo z připraveného prostředí prostě `pytest`.
 
 Nad každým pull requestem a nad `main` běží `.gitea/workflows/testy.yml` —
-84 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
+99 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
 v terminálové verzi, na kterou pytest nesahá.

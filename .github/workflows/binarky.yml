@@ -1,0 +1,124 @@
+# Binárky pro Windows a macOS.
+#
+# PyInstaller neumí křížovou kompilaci: binárku pro každý systém musí postavit
+# ten systém. Kupovat kvůli tomu Mac nebo krmit Windows VM by bylo přehnané,
+# tak si tyhle stroje půjčujeme od GitHub Actions.
+#
+# GitHub je tu jen půjčená dílna, ne druhý domov projektu: repozitář se sem
+# z Gitey zrcadlí a hotové soubory se posílají zpátky na tamní release přes
+# Gitea API. Jedna stránka s releasy, ta původní.
+#
+# Linux se tu schválně nestaví — o ten se stará vlastní runner
+# (.gitea/workflows/binarka.yml) a dělá to líp, proti glibc 2.17.
+name: binárky
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GITEA: https://gitea.spacilovi.eu
+  GITEA_REPO: david-spacil/dice-counter
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: kostky-windows-x86_64.exe
+            built: dist/kostky.exe
+          - os: macos-13          # poslední Intel běhoun
+            asset: kostky-macos-x86_64
+            built: dist/kostky
+          - os: macos-latest      # Apple Silicon
+            asset: kostky-macos-arm64
+            built: dist/kostky
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Testy
+        run: uv run --with-requirements requirements.txt --no-project pytest -q
+
+      - name: Binárka
+        run: ./build.sh
+
+      - name: Zkouška
+        run: |
+          # Binárka se musí umět rozbalit, najít šablony a začít poslouchat.
+          # Adresa se vnucuje, ať zkouška nezávisí na síti běhounu.
+          export DICE_HOST=127.0.0.1 DICE_PORT=8123 DICE_DB=zkouska/dice.db
+          "${{ matrix.built }}" &
+
+          for _ in $(seq 30); do
+              curl -sf -o /dev/null "http://127.0.0.1:8123/" && break
+              sleep 1
+          done
+
+          curl -sf -o /dev/null "http://127.0.0.1:8123/" || {
+              echo "Server se nerozeběhl." >&2; exit 1; }
+          curl -sf -o /dev/null "http://127.0.0.1:8123/static/style.css"
+          curl -sf "http://127.0.0.1:8123/board" | grep -q "127.0.0.1:8123"
+          test -f zkouska/dice.db
+
+          echo "Binárka jede."
+
+      - name: Na release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          api="$GITEA/api/v1/repos/$GITEA_REPO"
+          auth="Authorization: token $TOKEN"
+          json() { uv run --no-project python -c "$@"; }
+
+          # Release u tagu být může, ale nemusí — dá se založit i ručně a
+          # sahají na něj čtyři buildy naráz, tak se po neúspěchu ptáme znovu.
+          for _ in 1 2 3; do
+              id=$(curl -s -H "$auth" "$api/releases/tags/${GITHUB_REF_NAME}" \
+                  | json 'import json,sys; print(json.load(sys.stdin).get("id",""))')
+              [ -n "$id" ] && break
+
+              curl -s -o /dev/null -X POST -H "$auth" -H "Content-Type: application/json" \
+                  -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\"}" \
+                  "$api/releases"
+          done
+          [ -n "$id" ] || { echo "Release ${GITHUB_REF_NAME} se nepodařilo najít." >&2; exit 1; }
+
+          # macOS zná jen shasum, Git Bash na Windows jen sha256sum. Formát
+          # výsledku je stejný, takže se dá ověřit kterýmkoli z nich.
+          if command -v sha256sum >/dev/null; then
+              soucet() { sha256sum "$@"; }
+          else
+              soucet() { shasum -a 256 "$@"; }
+          fi
+
+          # Součet se počítá nad jménem, pod kterým se soubor stahuje, aby
+          # šel ověřit rovnou: shasum -a 256 -c kostky-macos-arm64.sha256
+          cp "${{ matrix.built }}" "$ASSET"
+          soucet "$ASSET" | tee "$ASSET.sha256"
+
+          for file in "$ASSET" "$ASSET.sha256"; do
+              # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
+              curl -s -H "$auth" "$api/releases/$id/assets" \
+                  | json 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == sys.argv[1]]' "$file" \
+                  | while read -r old; do
+                  curl -sf -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
+              done
+
+              curl -sf -o /dev/null -X POST -H "$auth" -F "attachment=@$file" \
+                  "$api/releases/$id/assets?name=$file"
+              echo "$file pověšen na ${GITHUB_REF_NAME}"
+          done
