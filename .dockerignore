@@ -1,0 +1,20 @@
+# Do image patří jen to, co appka za běhu potřebuje.
+.git/
+.github/
+.gitea/
+.venv/
+.build/
+.pytest_cache/
+__pycache__/
+dist/
+tests/
+deploy/
+*.db
+*.spec
+build.sh
+dice.py
+verze.txt
+README.md
+requirements*.in
+requirements-dev.txt
+requirements-build.txt

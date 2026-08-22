@@ -116,6 +116,65 @@ hlášku vysypal varování, že takhle se to nemá, a měl by pravdu.
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
 
+## Nasazení na server
+
+Kdo nechce každý večer spouštět binárku na notebooku, může to nechat běžet
+pořád. Obojí níž počítá **jen s domácí sítí** — appka nemá přihlašování
+a ani jedno nasazení ji nijak nezabezpečuje. Do internetu to nepatří.
+
+### Proxmox (LXC)
+
+Skript se pouští v terminálu uzlu Proxmoxu jako root. Založí kontejner,
+nastaví ho, stáhne poslední vydanou binárku, ověří kontrolní součet a zapne
+službu:
+
+```bash
+bash deploy/pve-kostky.sh
+```
+
+Na konci vypíše adresu, na které počitadlo poslouchá. Výchozí nastavení je
+1 jádro, 512 MB, 4 GB disku a Debian 13; přebíjí se proměnnými:
+
+```bash
+MEMORY=1024 STORAGE=local-zfs PORT=8080 bash deploy/pve-kostky.sh
+```
+
+Aktualizace na novější vydání je totéž s číslem kontejneru:
+
+```bash
+bash deploy/pve-kostky.sh update 123
+```
+
+Podoba je odkoukaná od [community-scripts.org](https://community-scripts.org),
+ale nic z jejich frameworku se nestahuje — jejich `build.func` si instalační
+skript hledá natvrdo ve vlastním repozitáři, takže mimo něj nefunguje.
+
+`deploy/lxc-install.sh` o Proxmoxu nic neví, takže se dá pustit i v LXC nebo
+virtuálu, který sis založil sám. Je idempotentní; druhé spuštění jen vymění
+binárku za nejnovější.
+
+### Docker
+
+```bash
+cd deploy && docker compose up -d
+```
+
+Staví se ze zdrojáků, takže image jde sestavit pro amd64 i arm64 a nezávisí
+na tom, jestli release pro danou architekturu proběhl. Databáze leží
+v pojmenovaném svazku, appka běží pod nerootovým uživatelem.
+
+**Pozor na síť.** Compose schválně používá `network_mode: host`. V bridge
+režimu kontejner uvnitř vidí adresu jako `172.17.0.2`, tabule ji poctivě
+nabídne a vygeneruje na ni QR kód — jenže z telefonu je nedosažitelná.
+Kdo bridge potřebuje, musí nastavit `DICE_HOST` na adresu hostitele v LAN.
+
+| | LXC | Docker |
+|---|---|---|
+| Odkud | vydaná binárka z releasu | zdrojáky |
+| Databáze | `/var/lib/kostky/dice.db` | svazek `kostky-data` |
+| Aktualizace | `pve-kostky.sh update <ctid>` | `docker compose build --pull` |
+| Adresa a QR | funguje samo | potřeba síť hostitele |
+
 ## Když se telefon nepřipojí
 
 Adresy se hledají při každém načtení tabule, takže přechod z domácí WiFi na
@@ -154,6 +213,7 @@ při remíze na prvním místě se hraje dál.
 | `build.sh`, `kostky.spec` | stavba binárky |
 | `.gitea/workflows/` | testy a linuxová binárka doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
+| `deploy/` | nasazení na server: Proxmox LXC a Docker |
 
 Terminálová verze zůstává funkční jako záloha:
 
