@@ -17,6 +17,7 @@ import qrcode
 from flask import (Flask, abort, g, redirect, render_template, request,
                    url_for)
 from markupsafe import Markup, escape
+from waitress import serve
 
 import console
 import net
@@ -353,4 +354,9 @@ if __name__ == "__main__":
         sys.exit(0)
 
     announce()
-    app.run(host="0.0.0.0", port=PORT, threaded=True)
+
+    # Ne vestavěný server Flasku: ten pod úvodní hlášku vysype červené
+    # varování, že takhle se to nemá, a má pravdu. Waitress je čistě
+    # pythonní, takže se zabalí do binárky bez řečí, a osm vláken pobere
+    # telefony u stolu i tabuli, která se doptává každé dvě vteřiny.
+    serve(app, host="0.0.0.0", port=PORT, threads=8)

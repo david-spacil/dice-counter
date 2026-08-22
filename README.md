@@ -106,6 +106,10 @@ schématu ještě nepsala, se poznají podle nuly a orazítkují se. Databázi
 založenou novější verzí počitadla appka odmítne otevřít, místo aby ji tiše
 rozbila.
 
+Obsluhuje to `waitress` — čistě pythonní WSGI server, který se zabalí do
+binárky stejně snadno jako zbytek. Vestavěný server Flasku by pod úvodní
+hlášku vysypal varování, že takhle se to nemá, a měl by pravdu.
+
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
 
