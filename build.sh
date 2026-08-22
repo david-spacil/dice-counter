@@ -23,7 +23,9 @@ printf '%s\n' "$VERSION" > verze.txt
 echo "Verze: $VERSION"
 
 uv python install "$PYTHON_VERSION"
-uv venv --quiet --managed-python --python "$PYTHON_VERSION" "$BUILD"
+# --clear, protože runner si pracovní adresář mezi běhy drží a uv nad
+# existujícím prostředím jinak skončí chybou. Stavíme načisto.
+uv venv --quiet --clear --managed-python --python "$PYTHON_VERSION" "$BUILD"
 
 # Windows dává spustitelné soubory venvu do Scripts/, zbytek světa do bin/.
 python="$BUILD/bin/python"
