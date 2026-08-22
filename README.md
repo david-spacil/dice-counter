@@ -116,6 +116,84 @@ hlášku vysypal varování, že takhle se to nemá, a měl by pravdu.
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
 
+## Nasazení na server
+
+Kdo nechce každý večer spouštět binárku na notebooku, může to nechat běžet
+pořád. Obojí níž počítá **jen s domácí sítí** — appka nemá přihlašování
+a ani jedno nasazení ji nijak nezabezpečuje. Do internetu to nepatří.
+
+### Proxmox (LXC)
+
+Jeden příkaz v terminálu uzlu Proxmoxu, jako root. Založí kontejner,
+nastaví ho, stáhne poslední vydanou binárku, ověří kontrolní součet a zapne
+službu:
+
+```bash
+bash -c "$(curl -fsSL https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/pve-kostky.sh)"
+```
+
+Na konci vypíše adresu, na které počitadlo poslouchá. Výchozí nastavení je
+1 jádro, 512 MB, 4 GB disku a Debian 13; úložiště si najde samo. Přebíjí se
+proměnnými před příkazem:
+
+```bash
+MEMORY=1024 STORAGE=local-zfs PORT=8080 bash -c "$(curl -fsSL ...)"
+```
+
+| Proměnná | Výchozí |
+|---|---|
+| `CTID` | první volné číslo |
+| `CT_HOSTNAME` | `kostky` |
+| `CORES`, `MEMORY`, `DISK` | `1`, `512`, `4` |
+| `STORAGE` | první aktivní úložiště pro kontejnery |
+| `TEMPLATE_STORAGE`, `BRIDGE` | `local`, `vmbr0` |
+| `PORT` | `8000` |
+| `UNPRIVILEGED`, `OSVERSION` | `1`, `13` |
+| `NESTING` | `1` — systemd v Debianu 13 ho potřebuje |
+| `VERSION` | poslední vydání |
+
+Aktualizace na novější vydání je ten samý příkaz s číslem kontejneru:
+
+```bash
+CTID=123 MODE=update bash -c "$(curl -fsSL ...)"
+```
+
+Podoba je odkoukaná od [community-scripts.org](https://community-scripts.org),
+ale nic z jejich frameworku se nestahuje — jejich `build.func` si instalační
+skript hledá natvrdo ve vlastním repozitáři, takže mimo něj nefunguje.
+
+Instalátor, který běží uvnitř kontejneru, je ve skriptu vložený jako text —
+přes rouru z curlu na disku hostitele žádný druhý soubor není. O Proxmoxu nic
+neví, takže se dá použít i v kontejneru, který sis založil sám:
+
+```bash
+bash pve-kostky.sh instalator > install.sh
+```
+
+Je idempotentní; druhé spuštění jen vymění binárku za nejnovější.
+
+### Docker
+
+```bash
+cd deploy && docker compose up -d
+```
+
+Staví se ze zdrojáků, takže image jde sestavit pro amd64 i arm64 a nezávisí
+na tom, jestli release pro danou architekturu proběhl. Databáze leží
+v pojmenovaném svazku, appka běží pod nerootovým uživatelem.
+
+**Pozor na síť.** Compose schválně používá `network_mode: host`. V bridge
+režimu kontejner uvnitř vidí adresu jako `172.17.0.2`, tabule ji poctivě
+nabídne a vygeneruje na ni QR kód — jenže z telefonu je nedosažitelná.
+Kdo bridge potřebuje, musí nastavit `DICE_HOST` na adresu hostitele v LAN.
+
+| | LXC | Docker |
+|---|---|---|
+| Odkud | vydaná binárka z releasu | zdrojáky |
+| Databáze | `/var/lib/kostky/dice.db` | svazek `kostky-data` |
+| Aktualizace | `pve-kostky.sh update <ctid>` | `docker compose build --pull` |
+| Adresa a QR | funguje samo | potřeba síť hostitele |
+
 ## Když se telefon nepřipojí
 
 Adresy se hledají při každém načtení tabule, takže přechod z domácí WiFi na
@@ -154,6 +232,7 @@ při remíze na prvním místě se hraje dál.
 | `build.sh`, `kostky.spec` | stavba binárky |
 | `.gitea/workflows/` | testy a linuxová binárka doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
+| `deploy/` | nasazení na server: Proxmox LXC a Docker |
 
 Terminálová verze zůstává funkční jako záloha:
 

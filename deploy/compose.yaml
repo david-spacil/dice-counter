@@ -1,0 +1,45 @@
+# Počitadlo kostek v Dockeru.
+#
+#     cd deploy && docker compose up -d
+#
+# Počítá se s domácí sítí. Appka nemá přihlašování, tohle ji nijak
+# nezabezpečuje a do internetu nepatří.
+
+services:
+  kostky:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        VERSION: ${VERSION:-vlastní sestavení}
+    image: kostky:latest
+    container_name: kostky
+    restart: unless-stopped
+
+    # Python jako PID 1 nesklízí osiřelé procesy a hůř reaguje na signály.
+    init: true
+
+    # Síť hostitele schválně. V bridge režimu kontejner uvnitř vidí adresu
+    # jako 172.17.0.2, tabule ji poctivě nabídne a vygeneruje na ni QR kód —
+    # jenže z telefonu je nedosažitelná. Se sítí hostitele appka najde tu
+    # adresu, na kterou se telefon opravdu dovolá.
+    #
+    # Kdo bridge potřebuje, ať zakomentuje řádek níž, odkomentuje ports
+    # a nastaví DICE_HOST na adresu hostitele v LAN:
+    #
+    #   ports:
+    #     - "8000:8000"
+    #   environment:
+    #     DICE_HOST: 192.168.1.10
+    network_mode: host
+
+    environment:
+      DICE_PORT: 8000
+      DICE_DB: /data/dice.db
+
+    volumes:
+      - kostky-data:/data
+
+volumes:
+  # Zálohu si stáhneš rovnou z appky přes /export, takže se sem nemusí lézt.
+  kostky-data:
