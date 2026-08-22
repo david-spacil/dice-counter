@@ -131,6 +131,7 @@ při remíze na prvním místě se hraje dál.
 | `stats.py` | síň slávy a kariérní statistiky |
 | `web.py` | Flask aplikace |
 | `dice.py` | totéž v terminálu, bez ukládání |
+| `console.py` | aby čeština prošla i windowsovou konzolí |
 | `build.sh`, `kostky.spec` | stavba binárky |
 | `.gitea/workflows/` | testy a linuxová binárka doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
@@ -216,5 +217,5 @@ uv run --with-requirements requirements.txt --no-project pytest
 Nebo z připraveného prostředí prostě `pytest`.
 
 Nad každým pull requestem a nad `main` běží `.gitea/workflows/testy.yml` —
-99 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
+102 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
 v terminálové verzi, na kterou pytest nesahá.

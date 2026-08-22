@@ -18,6 +18,7 @@ from flask import (Flask, abort, g, redirect, render_template, request,
                    url_for)
 from markupsafe import Markup, escape
 
+import console
 import net
 import stats
 import storage
@@ -320,6 +321,8 @@ def hall():
 
 
 if __name__ == "__main__":
+    console.utf8()
+
     found = net.addresses()
 
     if found:
