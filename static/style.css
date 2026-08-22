@@ -513,3 +513,11 @@ button {
   font-size: 0.85em;
   color: var(--ink);
 }
+
+/* Verze v patičce. Má být k nalezení, když ji někdo hledá, a jinak neplést. */
+.verze {
+  margin: 2rem 0 0.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.35;
+}

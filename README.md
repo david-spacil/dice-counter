@@ -14,6 +14,7 @@ Stáhni binárku pro svůj systém z
 | Systém | Soubor |
 |---|---|
 | Linux (x86-64) | `kostky-linux-x86_64` |
+| Linux (ARM64) | `kostky-linux-arm64` |
 | macOS (Apple Silicon) | `kostky-macos-arm64` |
 | macOS (Intel) | `kostky-macos-x86_64` |
 | Windows (x86-64) | `kostky-windows-x86_64.exe` |
@@ -59,11 +60,16 @@ Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará sám.
 Server vypíše všechny adresy, na kterých je dostupný:
 
 ```
+Kostky v1.1.0
+
 Počitadlo je dostupné na:
  → http://10.186.234.182:8000     místní síť
    http://100.91.0.24:8000        přes Tailscale
    http://172.17.0.1:8000         virtuální síť
 ```
+
+Kterou verzi máš, řekne i `kostky --version`; visí taky v patičce každé
+stránky. Když něco nefunguje, je to první věc, na kterou se zeptám.
 
 Na notebooku otevři `/board`, naskenuj QR kód telefonem a hraj. Tabule
 nabízí i zbylé adresy — když jedna nefunguje, klikni na jinou a QR kód se
@@ -93,7 +99,19 @@ napevno domovský adresář. Ze zdrojáků zůstává relativní, ať se dá mí
 sad vedle sebe.
 
 Zálohovat i stěhovat jde prostým zkopírováním souboru; `DICE_DB` si ho
-najde kdekoli.
+najde kdekoli. Kdo ho hledat nechce — a z binárky na Windows je zalezlý —
+si ho stáhne ze síně slávy odkazem **Stáhnout databázi** (`/export`). Kopie
+se dělá přes `VACUUM INTO`, takže je použitelná i uprostřed rozehrané hry.
+
+Schéma má verzi uloženou v `PRAGMA user_version` a `storage.migrate()` si
+databázi při každém připojení dorovná. Starší soubory z verzí, kdy se verze
+schématu ještě nepsala, se poznají podle nuly a orazítkují se. Databázi
+založenou novější verzí počitadla appka odmítne otevřít, místo aby ji tiše
+rozbila.
+
+Obsluhuje to `waitress` — čistě pythonní WSGI server, který se zabalí do
+binárky stejně snadno jako zbytek. Vestavěný server Flasku by pod úvodní
+hlášku vysypal varování, že takhle se to nemá, a měl by pravdu.
 
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
@@ -132,6 +150,7 @@ při remíze na prvním místě se hraje dál.
 | `web.py` | Flask aplikace |
 | `dice.py` | totéž v terminálu, bez ukládání |
 | `console.py` | aby čeština prošla i windowsovou konzolí |
+| `version.py` | která verze to je — z gitu, nebo z binárky |
 | `build.sh`, `kostky.spec` | stavba binárky |
 | `.gitea/workflows/` | testy a linuxová binárka doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
@@ -155,15 +174,44 @@ python -m venv .venv
 Na Fedoře stačí i systémové balíčky, pak se nemusí řešit vůbec nic:
 
 ```bash
-sudo dnf install python3-flask python3-qrcode python3-tabulate
+sudo dnf install python3-flask python3-qrcode python3-tabulate python3-waitress
 python3 web.py
 ```
+
+## Závislosti
+
+Verze jsou zamčené, aby binárka postavená dnes a za půl roku obsahovala
+totéž. Volné seznamy jsou v `.in`, zamčené v `.txt`:
+
+| Soubor | K čemu |
+|---|---|
+| `requirements.in` → `.txt` | běh aplikace |
+| `requirements-dev.in` → `.txt` | + pytest, pro testy |
+| `requirements-build.in` → `.txt` | + PyInstaller, pro stavbu binárky |
+
+Aktualizace je vědomý krok, ne vedlejší efekt toho, že něco vyšlo na PyPI:
+
+```bash
+for f in requirements requirements-dev requirements-build; do
+    uv pip compile "$f.in" -o "$f.txt"
+done
+```
+
+Verze se píšou ještě jednou v hlavičce PEP 723 na začátku `web.py` a
+`dice.py`, aby fungovalo `uv run web.py`. Že se ty dva zápisy shodují, hlídá
+`tests/test_zavislosti.py` — po každém přegenerování je potřeba hlavičky
+srovnat.
 
 ## Vlastní binárka
 
 ```bash
 ./build.sh
 ```
+
+Verzi si `build.sh` vezme z `git describe`, nebo se dá vnutit přes
+`VERSION=v1.2.3 ./build.sh`. Zapíše ji do `verze.txt`, `kostky.spec` ji
+přibalí a binárka ji pak umí ohlásit i na cizím počítači, kde žádný git není.
+Verzi Pythonu, proti kterému se staví, přebíjí `PYTHON_VERSION`.
 
 Staví se proti samostatnému CPythonu od `uv`, ne proti systémovému. Ten je
 slinkovaný s glibc 2.17; postavené proti Pythonu z Fedory 44 by to chtělo
@@ -184,8 +232,8 @@ Otagovaný commit spustí stavbu na obou stranách:
 
 | Kde | Co staví | Workflow |
 |---|---|---|
-| vlastní runner u Gitey | Linux | `.gitea/workflows/binarka.yml` |
-| GitHub Actions | Windows, macOS ×2 | `.github/workflows/binarky.yml` |
+| vlastní runner u Gitey | Linux x86-64 | `.gitea/workflows/binarka.yml` |
+| GitHub Actions | Windows, macOS ×2, Linux ARM64 | `.github/workflows/binarky.yml` |
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
@@ -194,9 +242,11 @@ git tag v1.0.0 && git push origin v1.0.0
 GitHub je tu jen půjčená dílna. Repozitář se tam z Gitey zrcadlí
 ([mirror](https://github.com/david-spacil/dice-counter)), postavené soubory
 se posílají zpátky na zdejší release přes Gitea API a projekt má pořád jednu
-stránku s releasy — tuhle. Linux se na GitHubu schválně nestaví; doma to jde
-proti staré glibc, a když GitHub vypadne, release má aspoň tu platformu,
-na které to reálně poběží.
+stránku s releasy — tuhle. Linux na x86-64 se na GitHubu schválně nestaví;
+doma to jde proti staré glibc, a když GitHub vypadne, release má aspoň tu
+platformu, na které to reálně poběží. ARM64 je výjimka — doma na něm není
+na čem stavět, a hodí se pro Raspberry Pi nebo jinou malou pořád zapnutou
+krabičku.
 
 Každá stavba nejdřív projede testy a zkusí hotovou binárku nastartovat, než
 ji kamkoli pověsí. Vedle každé visí i `.sha256`, takže se stažený soubor dá
@@ -217,5 +267,5 @@ uv run --with-requirements requirements.txt --no-project pytest
 Nebo z připraveného prostředí prostě `pytest`.
 
 Nad každým pull requestem a nad `main` běží `.gitea/workflows/testy.yml` —
-102 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
+118 testů na Pythonu 3.11, 3.12, 3.13 i 3.14, a k tomu skriptovaná partie
 v terminálové verzi, na kterou pytest nesahá.

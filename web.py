@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["flask", "qrcode"]
+# dependencies = ["flask==3.1.3", "qrcode==8.2", "waitress==3.0.2"]
 # ///
 """Webové počitadlo pro domácí síť.
 
@@ -8,20 +8,26 @@ Telefon zapisuje skóre (`/game/<id>`), notebook ukazuje zápisník (`/board`).
 Server-rendered HTML, formuláře přes POST/redirect/GET, žádný build step.
 """
 
+import io
 import os
+import shutil
 import socket
 import sys
+import tempfile
+from datetime import date
 from pathlib import Path
 
 import qrcode
 from flask import (Flask, abort, g, redirect, render_template, request,
-                   url_for)
+                   send_file, url_for)
 from markupsafe import Markup, escape
+from waitress import serve
 
 import console
 import net
 import stats
 import storage
+import version
 from core import FINAL_SCORE, Game, GameOver
 
 def bundled(folder: str) -> str:
@@ -123,6 +129,12 @@ def qr_svg(data: str) -> Markup:
         f'aria-label="QR kód s adresou {escape(data)}" '
         f'shape-rendering="crispEdges">{"".join(rects)}</svg>'
     )
+
+
+@app.context_processor
+def verze():
+    """Verze do patičky. Když někdo hlásí chybu, tohle je první otázka."""
+    return {"verze": version.current()}
 
 
 @app.template_filter("datum")
@@ -311,6 +323,36 @@ def board_panel(game_id: int):
     return render_template("_panel.html", **view(game, game_id, row))
 
 
+@app.route("/export")
+def export():
+    """Databáze ke stažení.
+
+    Dokud se hrálo ze zdrojáků, ležel `dice.db` v pracovním adresáři a záloha
+    byla otázka zkopírování. Z binárky se schovává do systémového datového
+    adresáře, který na Windows běžný člověk nenajde — tak ať se dá stáhnout
+    přes prohlížeč.
+
+    `VACUUM INTO` udělá konzistentní kopii i uprostřed zápisu, na rozdíl od
+    prostého přečtení souboru. Výsledek si přečteme do paměti a kopii hned
+    zahodíme: databáze počitadla se počítá v kilobajtech a takhle nezůstane
+    ležet v dočasném adresáři, když si ji někdo nestáhne celou.
+    """
+    conn = db()
+    conn.commit()                       # VACUUM nesmí běžet v transakci
+
+    docasny = tempfile.mkdtemp()
+    try:
+        kopie = Path(docasny) / "dice.db"
+        conn.execute("VACUUM INTO ?", (str(kopie),))
+        data = kopie.read_bytes()
+    finally:
+        shutil.rmtree(docasny, ignore_errors=True)
+
+    return send_file(io.BytesIO(data), mimetype="application/vnd.sqlite3",
+                     as_attachment=True,
+                     download_name=f"kostky-{date.today().isoformat()}.db")
+
+
 @app.route("/stats")
 def hall():
     conn = db()
@@ -320,8 +362,9 @@ def hall():
                            games=storage.recent_games(conn))
 
 
-if __name__ == "__main__":
-    console.utf8()
+def announce() -> None:
+    """Vypíše, kde všude je počitadlo k mání, a čím je zrovna spuštěné."""
+    print(f"Kostky {version.current()}\n")
 
     found = net.addresses()
 
@@ -336,4 +379,18 @@ if __name__ == "__main__":
 
     print(f"\nDatabáze: {storage.DB_PATH.resolve()}")
 
-    app.run(host="0.0.0.0", port=PORT, threaded=True)
+
+if __name__ == "__main__":
+    console.utf8()
+
+    if {"--version", "-V"} & set(sys.argv[1:]):
+        print(f"kostky {version.current()}")
+        sys.exit(0)
+
+    announce()
+
+    # Ne vestavěný server Flasku: ten pod úvodní hlášku vysype červené
+    # varování, že takhle se to nemá, a má pravdu. Waitress je čistě
+    # pythonní, takže se zabalí do binárky bez řečí, a osm vláken pobere
+    # telefony u stolu i tabuli, která se doptává každé dvě vteřiny.
+    serve(app, host="0.0.0.0", port=PORT, threads=8)

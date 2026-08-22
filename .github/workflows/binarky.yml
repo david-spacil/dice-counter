@@ -1,4 +1,4 @@
-# Binárky pro Windows a macOS.
+# Binárky pro Windows, macOS a Linux na ARM.
 #
 # PyInstaller neumí křížovou kompilaci: binárku pro každý systém musí postavit
 # ten systém. Kupovat kvůli tomu Mac nebo krmit Windows VM by bylo přehnané,
@@ -8,8 +8,10 @@
 # z Gitey zrcadlí a hotové soubory se posílají zpátky na tamní release přes
 # Gitea API. Jedna stránka s releasy, ta původní.
 #
-# Linux se tu schválně nestaví — o ten se stará vlastní runner
-# (.gitea/workflows/binarka.yml) a dělá to líp, proti glibc 2.17.
+# Linux na x86-64 se tu schválně nestaví — o ten se stará vlastní runner
+# (.gitea/workflows/binarka.yml). Když GitHub vypadne, release má pořád tu
+# platformu, na které to reálně poběží. ARM doma není na čem postavit, takže
+# ten jediný linuxový sem patří.
 name: binárky
 
 on:
@@ -37,6 +39,9 @@ jobs:
           - os: macos-latest      # Apple Silicon
             asset: kostky-macos-arm64
             built: dist/kostky
+          - os: ubuntu-24.04-arm  # pro Raspberry Pi a spol.
+            asset: kostky-linux-arm64
+            built: dist/kostky
 
     runs-on: ${{ matrix.os }}
     defaults:
@@ -52,10 +57,16 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
 
       - name: Testy
-        run: uv run --with-requirements requirements.txt --no-project pytest -q
+        run: uv run --with-requirements requirements-dev.txt --no-project pytest -q
 
       - name: Binárka
-        run: ./build.sh
+        run: |
+          # Na tagu je verze jistá. Jinde je repozitář naklonovaný mělce
+          # a build.sh si vystačí s tím, co z gitu vyčte.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+              export VERSION="$GITHUB_REF_NAME"
+          fi
+          ./build.sh
 
       - name: Zkouška
         run: |
@@ -74,6 +85,10 @@ jobs:
           curl -sf -o /dev/null "http://127.0.0.1:8123/static/style.css"
           curl -sf "http://127.0.0.1:8123/board" | grep -q "127.0.0.1:8123"
           test -f zkouska/dice.db
+
+          # Verze se musí do binárky opravdu dostat, ne se hlásit jako neznámá.
+          "${{ matrix.built }}" --version
+          ! "${{ matrix.built }}" --version | grep -q "neznámá"
 
           echo "Binárka jede."
 

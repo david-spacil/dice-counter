@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["tabulate"]
+# dependencies = ["tabulate==0.10.0"]
 # ///
 """Počitadlo skóre v terminálu.
 
@@ -8,11 +8,13 @@ Pravidla žijí v `core.Game`, tenhle modul je jen vstup a výstup. Hraje se
 v paměti, nic se neukládá — na historii je webová aplikace (`web.py`).
 """
 
+import sys
 from os import name, system
 
 from tabulate import tabulate
 
 import console
+import version
 from core import FINAL_SCORE, Game
 
 table_header = ["Hráč", "Skóre"]
@@ -130,4 +132,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     console.utf8()
+
+    if {"--version", "-V"} & set(sys.argv[1:]):
+        print(f"kostky {version.current()}")
+        sys.exit(0)
+
     main()

@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -182,3 +183,69 @@ def test_connect_zalozi_chybejici_adresar(tmp_path):
     conn.close()
 
     assert (tmp_path / "novy" / "adresar" / "dice.db").exists()
+
+
+# --- verze schématu ---------------------------------------------------------
+
+def verze(conn) -> int:
+    return conn.execute("PRAGMA user_version").fetchone()[0]
+
+
+def test_nova_databaze_je_orazitkovana(tmp_path):
+    conn = storage.connect(tmp_path / "nova.db")
+    try:
+        assert verze(conn) == storage.SCHEMA_VERSION
+    finally:
+        conn.close()
+
+
+def test_databaze_z_doby_pred_verzovanim_prezije(tmp_path):
+    """Přesně to, co lidem leží na disku z verzí 1.0 a 1.1.
+
+    Tabulky má, razítko ne. Nesmí se ani přijít o data, ani spadnout.
+    """
+    path = tmp_path / "stara.db"
+    stara = sqlite3.connect(path)
+    stara.executescript(storage.SCHEMA)      # bez PRAGMA user_version
+    stara.execute("INSERT INTO players (name, key, created_at) "
+                  "VALUES ('Adam', 'adam', '2026-01-01T00:00:00')")
+    stara.commit()
+    stara.close()
+
+    conn = storage.connect(path)
+    try:
+        assert verze(conn) == storage.SCHEMA_VERSION
+        assert [p["name"] for p in storage.known_players(conn)] == ["Adam"]
+    finally:
+        conn.close()
+
+
+def test_migrace_dojede_jen_ty_chybejici(tmp_path, monkeypatch):
+    """Podruhé už krok proběhnout nesmí — jinak by ALTER TABLE spadl."""
+    monkeypatch.setattr(storage, "MIGRATIONS",
+                        ["ALTER TABLE players ADD COLUMN barva TEXT;"])
+    monkeypatch.setattr(storage, "SCHEMA_VERSION", 2)
+
+    path = tmp_path / "migrovana.db"
+    conn = storage.connect(path)
+    conn.close()
+
+    conn = storage.connect(path)             # druhé spuštění téže verze
+    try:
+        assert verze(conn) == 2
+        sloupce = [r[1] for r in conn.execute("PRAGMA table_info(players)")]
+        assert "barva" in sloupce
+    finally:
+        conn.close()
+
+
+def test_databaze_z_novejsi_verze_se_odmitne(tmp_path):
+    """Radši srozumitelná hláška než tiše rozbitá data."""
+    path = tmp_path / "budouci.db"
+    conn = storage.connect(path)
+    conn.execute(f"PRAGMA user_version = {storage.SCHEMA_VERSION + 1}")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RuntimeError, match="novější verze"):
+        storage.connect(path)

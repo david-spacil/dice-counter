@@ -1,0 +1,4 @@
+# Co je potřeba k vývoji a testům. Zamyká se do requirements-dev.txt:
+#     uv pip compile requirements-dev.in -o requirements-dev.txt
+-r requirements.in
+pytest

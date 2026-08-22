@@ -1,0 +1,4 @@
+# Co je potřeba ke stavbě binárky. Zamyká se do requirements-build.txt:
+#     uv pip compile requirements-build.in -o requirements-build.txt
+-r requirements.in
+pyinstaller

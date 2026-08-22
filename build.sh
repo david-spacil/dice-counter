@@ -12,11 +12,20 @@
 # se do ní nedostane, takže kontejner k tomu není potřeba.
 set -euo pipefail
 
-VERSION=${VERSION:-3.11}
+PYTHON_VERSION=${PYTHON_VERSION:-3.11}
 BUILD=${BUILD:-.build}
 
-uv python install "$VERSION"
-uv venv --quiet --managed-python --python "$VERSION" "$BUILD"
+# Verze, kterou binárka ohlásí přes --version. V CI ji na tagu vnutíme
+# proměnnou, protože tam je repozitář naklonovaný na jeden commit a git
+# describe nemá o co se opřít.
+VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo neznámá)}
+printf '%s\n' "$VERSION" > verze.txt
+echo "Verze: $VERSION"
+
+uv python install "$PYTHON_VERSION"
+# --clear, protože runner si pracovní adresář mezi běhy drží a uv nad
+# existujícím prostředím jinak skončí chybou. Stavíme načisto.
+uv venv --quiet --clear --managed-python --python "$PYTHON_VERSION" "$BUILD"
 
 # Windows dává spustitelné soubory venvu do Scripts/, zbytek světa do bin/.
 python="$BUILD/bin/python"
@@ -26,7 +35,7 @@ if [ -d "$BUILD/Scripts" ]; then
     pyinstaller="$BUILD/Scripts/pyinstaller.exe"
 fi
 
-uv pip install --quiet --python "$python" -r requirements.txt pyinstaller
+uv pip install --quiet --python "$python" -r requirements-build.txt
 
 "$pyinstaller" --clean --noconfirm \
     --distpath dist --workpath "$BUILD/work" kostky.spec
