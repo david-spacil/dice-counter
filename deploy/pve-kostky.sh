@@ -37,6 +37,7 @@ PORT="${PORT:-8000}"
 UNPRIVILEGED="${UNPRIVILEGED:-1}"
 OSVERSION="${OSVERSION:-13}"
 NESTING="${NESTING:-1}"
+AUTOLOGIN="${AUTOLOGIN:-1}"      # konzole ve webu Proxmoxu bez hesla
 VERSION="${VERSION:-}"          # prázdné = poslední vydání
 
 # --- výpisy ------------------------------------------------------------------
@@ -173,6 +174,53 @@ systemctl daemon-reload
 systemctl enable --quiet --now kostky
 ok "Služba běží"
 
+# --- konzole v rozhraní Proxmoxu --------------------------------------------
+
+if [ "${AUTOLOGIN:-1}" = "1" ]; then
+    msg "Nastavuji konzoli"
+    # Kontejner nemá root heslo, takže by se do konzole ve webu Proxmoxu
+    # nedalo dostat. Autologin to řeší stejně, jako to dělají community-scripts.
+    # Nová práva to nikomu nedává — kdo má web Proxmoxu, má root na uzlu tak
+    # jako tak.
+    mkdir -p /etc/systemd/system/container-getty@1.service.d
+    cat > /etc/systemd/system/container-getty@1.service.d/override.conf <<'GETTY'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%I 115200,38400,9600 $TERM
+GETTY
+    systemctl daemon-reload
+    systemctl restart container-getty@1.service 2>/dev/null || true
+    ok "Konzole se přihlásí sama"
+fi
+
+# --- příkaz update ----------------------------------------------------------
+
+# Instalátor si necháme, ať je z čeho aktualizovat. Když se skript pouští
+# rourou, soubor neexistuje a zůstane ten z minula.
+if [ -f "$0" ]; then
+    install -m 755 "$0" "$HOME_DIR/install.sh"
+fi
+
+cat > /usr/bin/update <<UPDATE
+#!/usr/bin/env bash
+# Aktualizace počitadla na poslední vydání. Stačí napsat: update
+set -euo pipefail
+
+# Nejdřív zkusíme obnovit i samotný instalátor, kdyby se mezitím zlepšil.
+# Bez sítě nebo při změněné adrese se použije ten uložený.
+NOVY=\$(mktemp)
+if curl -fsSL "$GITEA/$REPO/raw/branch/main/deploy/pve-kostky.sh" -o "\$NOVY" 2>/dev/null \\
+    && bash "\$NOVY" instalator > "\$NOVY.in" 2>/dev/null \\
+    && bash -n "\$NOVY.in" 2>/dev/null; then
+    install -m 755 "\$NOVY.in" "$HOME_DIR/install.sh"
+fi
+rm -f "\$NOVY" "\$NOVY.in"
+
+exec env PORT="$PORT" GITEA="$GITEA" REPO="$REPO" bash "$HOME_DIR/install.sh"
+UPDATE
+chmod 755 /usr/bin/update
+ok "Aktualizovat půjde příkazem: update"
+
 msg "Čekám, až začne odpovídat"
 for _ in $(seq 30); do
     curl -fsS -o /dev/null "http://127.0.0.1:$PORT/" 2>/dev/null && break
@@ -199,7 +247,7 @@ install_into() {
     rm -f "$tmp"
 
     pct exec "$ctid" -- env PORT="$PORT" GITEA="$GITEA" REPO="$REPO" \
-        VERSION="$VERSION" bash /root/kostky-install.sh
+        VERSION="$VERSION" AUTOLOGIN="$AUTOLOGIN" bash /root/kostky-install.sh
 }
 
 address_of() {
@@ -218,6 +266,7 @@ hotovo() {
     echo -e "  Zadávání z telefonu:   \e[1;32mhttp://${ip}:${PORT}/\e[0m"
     echo
     echo -e "  \e[2mDatabáze:  /var/lib/kostky/dice.db (uvnitř kontejneru)"
+    echo -e "  Aktualizace: v konzoli kontejneru napiš  update"
     echo -e "  Log:       pct exec $ctid -- journalctl -u kostky -f"
     echo -e "  Konzole:   pct enter $ctid"
     echo -e "  Zrušit:    pct stop $ctid && pct destroy $ctid\e[0m"

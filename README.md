@@ -150,13 +150,31 @@ MEMORY=1024 STORAGE=local-zfs PORT=8080 bash -c "$(curl -fsSL ...)"
 | `PORT` | `8000` |
 | `UNPRIVILEGED`, `OSVERSION` | `1`, `13` |
 | `NESTING` | `1` — systemd v Debianu 13 ho potřebuje |
+| `AUTOLOGIN` | `1` — konzole ve webu Proxmoxu bez hesla |
 | `VERSION` | poslední vydání |
 
-Aktualizace na novější vydání je ten samý příkaz s číslem kontejneru:
+Aktualizace na novější vydání se dá spustit dvěma způsoby. Buď zevnitř
+kontejneru, kde na to stačí jedno slovo:
+
+```bash
+update
+```
+
+Nebo z uzlu Proxmoxu tím samým příkazem s číslem kontejneru:
 
 ```bash
 CTID=123 MODE=update bash -c "$(curl -fsSL ...)"
 ```
+
+Obojí vymění binárku za poslední vydání a službu restartuje; databáze zůstává.
+Příkaz `update` si přitom obnoví i sám sebe — instalátor bere z větve `main`,
+takže jede na nejnovější verzi skriptu, ne na té, se kterou se instalovalo.
+
+Do konzole kontejneru se dostaneš přímo z webu Proxmoxu, **žádné jméno ani
+heslo se nezadává** — kontejner root heslo nemá a konzole se přihlašuje sama.
+Nová práva to nikomu nedává: kdo se dostane do webu Proxmoxu, má root na uzlu
+tak jako tak. Komu se to nezdá, vypne to přes `AUTOLOGIN=0` a do kontejneru
+pak leze přes `pct enter <ctid>`.
 
 Podoba je odkoukaná od [community-scripts.org](https://community-scripts.org),
 ale nic z jejich frameworku se nestahuje — jejich `build.func` si instalační
