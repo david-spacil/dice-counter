@@ -49,7 +49,7 @@ jobs:
       - name: Testy
         run: |
           uv run --managed-python --python "${{ matrix.python }}" \
-              --with-requirements requirements.txt --no-project \
+              --with-requirements requirements-dev.txt --no-project \
               pytest -q
 
       - name: Terminálová verze

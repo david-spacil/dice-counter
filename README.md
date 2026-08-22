@@ -155,9 +155,33 @@ python -m venv .venv
 Na Fedoře stačí i systémové balíčky, pak se nemusí řešit vůbec nic:
 
 ```bash
-sudo dnf install python3-flask python3-qrcode python3-tabulate
+sudo dnf install python3-flask python3-qrcode python3-tabulate python3-waitress
 python3 web.py
 ```
+
+## Závislosti
+
+Verze jsou zamčené, aby binárka postavená dnes a za půl roku obsahovala
+totéž. Volné seznamy jsou v `.in`, zamčené v `.txt`:
+
+| Soubor | K čemu |
+|---|---|
+| `requirements.in` → `.txt` | běh aplikace |
+| `requirements-dev.in` → `.txt` | + pytest, pro testy |
+| `requirements-build.in` → `.txt` | + PyInstaller, pro stavbu binárky |
+
+Aktualizace je vědomý krok, ne vedlejší efekt toho, že něco vyšlo na PyPI:
+
+```bash
+for f in requirements requirements-dev requirements-build; do
+    uv pip compile "$f.in" -o "$f.txt"
+done
+```
+
+Verze se píšou ještě jednou v hlavičce PEP 723 na začátku `web.py` a
+`dice.py`, aby fungovalo `uv run web.py`. Že se ty dva zápisy shodují, hlídá
+`tests/test_zavislosti.py` — po každém přegenerování je potřeba hlavičky
+srovnat.
 
 ## Vlastní binárka
 

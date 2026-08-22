@@ -26,7 +26,7 @@ if [ -d "$BUILD/Scripts" ]; then
     pyinstaller="$BUILD/Scripts/pyinstaller.exe"
 fi
 
-uv pip install --quiet --python "$python" -r requirements.txt pyinstaller
+uv pip install --quiet --python "$python" -r requirements-build.txt
 
 "$pyinstaller" --clean --noconfirm \
     --distpath dist --workpath "$BUILD/work" kostky.spec

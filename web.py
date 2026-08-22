@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["flask", "qrcode"]
+# dependencies = ["flask==3.1.3", "qrcode==8.2", "waitress==3.0.2"]
 # ///
 """Webové počitadlo pro domácí síť.
 

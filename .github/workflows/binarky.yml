@@ -52,7 +52,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
 
       - name: Testy
-        run: uv run --with-requirements requirements.txt --no-project pytest -q
+        run: uv run --with-requirements requirements-dev.txt --no-project pytest -q
 
       - name: Binárka
         run: ./build.sh

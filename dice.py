@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["tabulate"]
+# dependencies = ["tabulate==0.10.0"]
 # ///
 """Počitadlo skóre v terminálu.
 

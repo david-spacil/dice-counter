@@ -1,0 +1,6 @@
+# Běhové závislosti. Verze se zamykají do requirements.txt přes:
+#     uv pip compile requirements.in -o requirements.txt
+flask
+qrcode
+tabulate
+waitress
