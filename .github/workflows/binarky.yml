@@ -31,7 +31,7 @@ jobs:
           - os: windows-latest
             asset: kostky-windows-x86_64.exe
             built: dist/kostky.exe
-          - os: macos-13          # poslední Intel běhoun
+          - os: macos-15-intel    # Intel; macos-13 GitHub zrušil
             asset: kostky-macos-x86_64
             built: dist/kostky
           - os: macos-latest      # Apple Silicon
@@ -44,9 +44,12 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v7
+      # Přesné verze, ne plovoucí `v7`. Ta u setup-uv nevede tam, kam by
+      # člověk čekal — hlavní značky se přestaly vydávat po v7, takže `v10`
+      # neexistuje, i když vydání v10.0.1 ano.
+      - uses: actions/checkout@v7.0.1
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
 
       - name: Testy
         run: uv run --with-requirements requirements.txt --no-project pytest -q
