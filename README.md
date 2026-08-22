@@ -14,6 +14,7 @@ Stáhni binárku pro svůj systém z
 | Systém | Soubor |
 |---|---|
 | Linux (x86-64) | `kostky-linux-x86_64` |
+| Linux (ARM64) | `kostky-linux-arm64` |
 | macOS (Apple Silicon) | `kostky-macos-arm64` |
 | macOS (Intel) | `kostky-macos-x86_64` |
 | Windows (x86-64) | `kostky-windows-x86_64.exe` |
@@ -229,8 +230,8 @@ Otagovaný commit spustí stavbu na obou stranách:
 
 | Kde | Co staví | Workflow |
 |---|---|---|
-| vlastní runner u Gitey | Linux | `.gitea/workflows/binarka.yml` |
-| GitHub Actions | Windows, macOS ×2 | `.github/workflows/binarky.yml` |
+| vlastní runner u Gitey | Linux x86-64 | `.gitea/workflows/binarka.yml` |
+| GitHub Actions | Windows, macOS ×2, Linux ARM64 | `.github/workflows/binarky.yml` |
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
@@ -239,9 +240,11 @@ git tag v1.0.0 && git push origin v1.0.0
 GitHub je tu jen půjčená dílna. Repozitář se tam z Gitey zrcadlí
 ([mirror](https://github.com/david-spacil/dice-counter)), postavené soubory
 se posílají zpátky na zdejší release přes Gitea API a projekt má pořád jednu
-stránku s releasy — tuhle. Linux se na GitHubu schválně nestaví; doma to jde
-proti staré glibc, a když GitHub vypadne, release má aspoň tu platformu,
-na které to reálně poběží.
+stránku s releasy — tuhle. Linux na x86-64 se na GitHubu schválně nestaví;
+doma to jde proti staré glibc, a když GitHub vypadne, release má aspoň tu
+platformu, na které to reálně poběží. ARM64 je výjimka — doma na něm není
+na čem stavět, a hodí se pro Raspberry Pi nebo jinou malou pořád zapnutou
+krabičku.
 
 Každá stavba nejdřív projede testy a zkusí hotovou binárku nastartovat, než
 ji kamkoli pověsí. Vedle každé visí i `.sha256`, takže se stažený soubor dá

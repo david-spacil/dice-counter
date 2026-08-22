@@ -1,4 +1,4 @@
-# Binárky pro Windows a macOS.
+# Binárky pro Windows, macOS a Linux na ARM.
 #
 # PyInstaller neumí křížovou kompilaci: binárku pro každý systém musí postavit
 # ten systém. Kupovat kvůli tomu Mac nebo krmit Windows VM by bylo přehnané,
@@ -8,8 +8,10 @@
 # z Gitey zrcadlí a hotové soubory se posílají zpátky na tamní release přes
 # Gitea API. Jedna stránka s releasy, ta původní.
 #
-# Linux se tu schválně nestaví — o ten se stará vlastní runner
-# (.gitea/workflows/binarka.yml) a dělá to líp, proti glibc 2.17.
+# Linux na x86-64 se tu schválně nestaví — o ten se stará vlastní runner
+# (.gitea/workflows/binarka.yml). Když GitHub vypadne, release má pořád tu
+# platformu, na které to reálně poběží. ARM doma není na čem postavit, takže
+# ten jediný linuxový sem patří.
 name: binárky
 
 on:
@@ -36,6 +38,9 @@ jobs:
             built: dist/kostky
           - os: macos-latest      # Apple Silicon
             asset: kostky-macos-arm64
+            built: dist/kostky
+          - os: ubuntu-24.04-arm  # pro Raspberry Pi a spol.
+            asset: kostky-linux-arm64
             built: dist/kostky
 
     runs-on: ${{ matrix.os }}
