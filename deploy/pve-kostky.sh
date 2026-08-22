@@ -36,6 +36,7 @@ BRIDGE="${BRIDGE:-vmbr0}"
 PORT="${PORT:-8000}"
 UNPRIVILEGED="${UNPRIVILEGED:-1}"
 OSVERSION="${OSVERSION:-13}"
+NESTING="${NESTING:-1}"
 VERSION="${VERSION:-}"          # prázdné = poslední vydání
 
 # --- výpisy ------------------------------------------------------------------
@@ -299,6 +300,9 @@ else
     ok "Šablona $TEMPLATE"
 fi
 
+# Nesting: Debian 13 veze systemd 257 a ten v neprivilegovaném kontejneru bez
+# něj nedostane, co potřebuje — Proxmox na to při startu sám upozorňuje.
+# Stejnou výchozí hodnotu mají i community-scripts.
 msg "Zakládám kontejner"
 pct create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
     --hostname "$CT_HOSTNAME" \
@@ -308,6 +312,7 @@ pct create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
     --rootfs "$STORAGE:$DISK" \
     --net0 "name=eth0,bridge=$BRIDGE,ip=dhcp" \
     --unprivileged "$UNPRIVILEGED" \
+    --features "nesting=$NESTING" \
     --ostype debian \
     --onboot 1 \
     --description "$APP — $GITEA/$REPO" >/dev/null

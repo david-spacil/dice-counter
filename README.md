@@ -149,6 +149,7 @@ MEMORY=1024 STORAGE=local-zfs PORT=8080 bash -c "$(curl -fsSL ...)"
 | `TEMPLATE_STORAGE`, `BRIDGE` | `local`, `vmbr0` |
 | `PORT` | `8000` |
 | `UNPRIVILEGED`, `OSVERSION` | `1`, `13` |
+| `NESTING` | `1` — systemd v Debianu 13 ho potřebuje |
 | `VERSION` | poslední vydání |
 
 Aktualizace na novější vydání je ten samý příkaz s číslem kontejneru:
