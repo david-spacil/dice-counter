@@ -95,6 +95,12 @@ sad vedle sebe.
 Zálohovat i stěhovat jde prostým zkopírováním souboru; `DICE_DB` si ho
 najde kdekoli.
 
+Schéma má verzi uloženou v `PRAGMA user_version` a `storage.migrate()` si
+databázi při každém připojení dorovná. Starší soubory z verzí, kdy se verze
+schématu ještě nepsala, se poznají podle nuly a orazítkují se. Databázi
+založenou novější verzí počitadla appka odmítne otevřít, místo aby ji tiše
+rozbila.
+
 Počítá se s domácí sítí — appka nemá přihlašování a kdokoli na stejné WiFi
 může zapisovat.
 

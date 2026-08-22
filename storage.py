@@ -86,6 +86,45 @@ CREATE TABLE IF NOT EXISTS turns (
 CREATE INDEX IF NOT EXISTS turns_game ON turns(game_id, id);
 """
 
+# Každý krok posouvá schéma o jedno dál; krok na indexu 0 vede z verze 1 na 2.
+# Přidávat jen na konec a nikdy nesahat na ten, který už někomu proběhl —
+# databáze leží lidem na discích a zpátky se nedají stáhnout.
+MIGRATIONS: list[str] = []
+
+SCHEMA_VERSION = 1 + len(MIGRATIONS)
+
+
+def migrate(conn: sqlite3.Connection) -> int:
+    """Dorovná databázi na aktuální schéma a vrátí její verzi.
+
+    Verze se drží v `PRAGMA user_version`, což je celé číslo, které si SQLite
+    veze v hlavičce souboru a jinak si ho nevšímá.
+
+    Nula znamená dvojí: buď je soubor prázdný, nebo pochází z doby, kdy se
+    verze ještě nezapisovala. Obojí se vyřeší stejně — `SCHEMA` je samé
+    `IF NOT EXISTS`, takže na hotové databázi neudělá nic a jen se orazítkuje.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    if version > SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Databáze je ve verzi {version}, tahle aplikace umí "
+            f"{SCHEMA_VERSION}. Nejspíš ji založila novější verze počitadla; "
+            f"aktualizuj, ať o data nepřijdeš.")
+
+    if version == 0:
+        conn.executescript(SCHEMA)
+        version = 1
+
+    for step in MIGRATIONS[version - 1:]:
+        conn.executescript(step)
+        version += 1
+
+    # PRAGMA neumí zástupné otazníky. Číslo sem teče z kódu, ne od uživatele.
+    conn.execute(f"PRAGMA user_version = {version}")
+    conn.commit()
+    return version
+
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     target = Path(path or DB_PATH)
@@ -93,7 +132,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(target)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(SCHEMA)
+    migrate(conn)
     return conn
 
 
