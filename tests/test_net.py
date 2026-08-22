@@ -90,3 +90,50 @@ def test_v_systemu_se_neco_najde():
 
     assert all(net.classify(a.ip, a.interface) for a in found)
     assert len({a.ip for a in found}) == len(found)
+
+
+IFCONFIG_MACOS = """\
+lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384
+\toptions=1203<RXCSUM,TXCSUM,TXSTATUS,SW_TIMESTAMP>
+\tinet 127.0.0.1 netmask 0xff000000
+\tinet6 ::1 prefixlen 128
+gif0: flags=8010<POINTOPOINT,MULTICAST> mtu 1280
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+\tether 3c:22:fb:aa:bb:cc
+\tinet6 fe80::14b0:6b1a:9e2f:1a4c%en0 prefixlen 64 secured scopeid 0xb
+\tinet 192.168.0.42 netmask 0xffffff00 broadcast 192.168.0.255
+\tmedia: autoselect
+\tstatus: active
+utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1280
+\tinet 100.99.98.97 --> 100.99.98.97 netmask 0xff000000
+"""
+
+
+def test_ifconfig_vytahne_rozhrani_a_adresy():
+    """macOS na ioctl z Linuxu neslyší, tak se čte výstup ifconfigu."""
+    assert net.parse_ifconfig(IFCONFIG_MACOS) == [
+        ("lo0", "127.0.0.1"),
+        ("en0", "192.168.0.42"),
+        ("utun4", "100.99.98.97"),
+    ]
+
+
+def test_ifconfig_si_neplete_inet6_s_inet():
+    """`inet6` začíná stejně jako `inet`; IPv6 adresy tudy projít nesmí."""
+    assert net.parse_ifconfig("en0: flags=1\n\tinet6 fe80::1 prefixlen 64\n") == []
+
+
+def test_adresy_z_ifconfigu_projdou_celym_retezem(monkeypatch):
+    """Bez linuxového ioctl se sáhne po ifconfigu, teprve pak po hostname."""
+    monkeypatch.delenv("DICE_HOST", raising=False)
+    monkeypatch.setattr(net, "_from_interfaces", lambda: [])
+    monkeypatch.setattr(net, "_from_ifconfig",
+                        lambda: net.parse_ifconfig(IFCONFIG_MACOS))
+    monkeypatch.setattr(net, "_from_hostname", lambda: pytest.fail("moc brzy"))
+    monkeypatch.setattr(net, "default_route_address", lambda: "192.168.0.42")
+
+    found = net.addresses()
+
+    assert [a.ip for a in found] == ["192.168.0.42", "100.99.98.97"]
+    assert found[0].primary and found[0].interface == "en0"
+    assert found[1].kind == "tailnet"

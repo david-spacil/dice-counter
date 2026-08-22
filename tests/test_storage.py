@@ -148,9 +148,26 @@ def test_umisteni_databaze_z_binarky(monkeypatch, tmp_path):
     """Binárka se rozbaluje do dočasného adresáře, databáze tam nesmí."""
     monkeypatch.delenv("DICE_DB", raising=False)
     monkeypatch.setattr(storage.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(storage.sys, "platform", "linux")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
 
     assert storage.default_db() == tmp_path / "kostky" / "dice.db"
+
+
+def test_data_home_podle_systemu(monkeypatch, tmp_path):
+    """Každý systém má svůj adresář na data; XDG je jen ten linuxový."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "AppData" / "Local"))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+    monkeypatch.setattr(storage.sys, "platform", "win32")
+    assert storage.data_home() == tmp_path / "AppData" / "Local"
+
+    monkeypatch.setattr(storage.sys, "platform", "darwin")
+    assert storage.data_home() == tmp_path / "Library" / "Application Support"
+
+    monkeypatch.setattr(storage.sys, "platform", "linux")
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    assert storage.data_home() == tmp_path / ".local" / "share"
 
 
 def test_dice_db_prebije_oboje(monkeypatch, tmp_path):

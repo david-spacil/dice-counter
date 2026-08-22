@@ -16,20 +16,30 @@ from pathlib import Path
 
 from core import FINAL_SCORE, Game, Turn
 
+def data_home() -> Path:
+    """Adresář, kam podle zvyklostí systému patří data aplikací."""
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA")
+        return Path(local) if local else Path.home() / "AppData" / "Local"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME")
+                or Path.home() / ".local" / "share")
+
+
 def default_db() -> Path:
     """Kam se ukládá databáze.
 
     Ze zdrojáků do pracovního adresáře — dá se tak mít víc rozehraných
     sad vedle sebe a je vidět, s čím se pracuje. Z binárky do datového
-    adresáře podle XDG: binárka se spouští odkudkoli a rozbaluje se do
+    adresáře podle systému: binárka se spouští odkudkoli a rozbaluje se do
     dočasného adresáře, takže relativní cesta by databázi rozsypala po disku.
     """
     chosen = os.environ.get("DICE_DB")
     if chosen:
         return Path(chosen)
     if getattr(sys, "frozen", False):
-        share = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
-        return Path(share) / "kostky" / "dice.db"
+        return data_home() / "kostky" / "dice.db"
     return Path("dice.db")
 
 

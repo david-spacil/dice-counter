@@ -5,6 +5,8 @@ Staví se přes `./build.sh`, ne ručně — ta se stará o to, aby výsledek je
 i na starších systémech, než je ten tvůj.
 """
 
+import sys
+
 analysis = Analysis(
     ["web.py"],
     pathex=["."],
@@ -21,6 +23,9 @@ exe = EXE(
     analysis.datas,
     name="kostky",
     console=True,
-    strip=True,
+    # Ořezání symbolů šetří pár megabajtů, ale jen na Linuxu. Na macOS by
+    # rozbilo podpis, který si PyInstaller sám přidává a bez kterého se
+    # binárka na Apple Silicon vůbec nespustí; na Windows nedělá nic.
+    strip=sys.platform == "linux",
     upx=False,
 )
