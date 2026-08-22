@@ -40,6 +40,10 @@ VERSION="${VERSION:-}"          # prázdné = poslední vydání
 
 # --- výpisy ------------------------------------------------------------------
 
+# Bez tohohle Ctrl+C zabije jen rozdělaný podproces a skript jede vesele dál
+# — třeba rovnou zakládat kontejner, na který se čekat nemá.
+trap 'echo; echo -e "\e[1;31m  ✗\e[0m Přerušeno." >&2; exit 130' INT TERM
+
 msg() { echo -e "\e[1;34m  →\e[0m $*"; }
 ok()  { echo -e "\e[1;32m  ✓\e[0m $*"; }
 die() { echo -e "\e[1;31m  ✗\e[0m $*" >&2; exit 1; }
@@ -215,7 +219,7 @@ hotovo() {
     echo -e "  \e[2mDatabáze:  /var/lib/kostky/dice.db (uvnitř kontejneru)"
     echo -e "  Log:       pct exec $ctid -- journalctl -u kostky -f"
     echo -e "  Konzole:   pct enter $ctid"
-    echo -e "  Zrušit:    pct stop $ctid \&\& pct destroy $ctid\e[0m"
+    echo -e "  Zrušit:    pct stop $ctid && pct destroy $ctid\e[0m"
     echo
 }
 
@@ -272,17 +276,28 @@ fi
 CTID="${CTID:-$(pvesh get /cluster/nextid)}"
 msg "Kontejner dostane číslo $CTID"
 
-msg "Hledám šablonu Debianu $OSVERSION"
-pveam update >/dev/null 2>&1 || true
-TEMPLATE=$(pveam available --section system \
-    | awk '{print $2}' | grep "^debian-${OSVERSION}-standard" | sort -V | tail -1)
-[ -n "$TEMPLATE" ] || die "Šablona pro Debian $OSVERSION není k dispozici."
+# Architektura uzlu, ne první šablona v seznamu. pveam nabízí amd64 i arm64
+# vedle sebe a bez tohohle filtru by výběr padl na tu abecedně poslední.
+ARCH=$(dpkg --print-architecture)
+SABLONA="debian-${OSVERSION}-standard[^[:space:]]*_${ARCH}\.tar\.[a-z]*"
 
-if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
+msg "Hledám šablonu Debianu $OSVERSION pro $ARCH"
+
+# Nejdřív co už na uzlu leží — stahovat 120 MB znovu je zbytečné.
+TEMPLATE=$(pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -o "$SABLONA" | sort -V | tail -1)
+
+if [ -n "$TEMPLATE" ]; then
+    ok "Šablona $TEMPLATE (už je na uzlu)"
+else
+    pveam update >/dev/null 2>&1 || true
+    TEMPLATE=$(pveam available --section system 2>/dev/null | grep -o "$SABLONA" | sort -V | tail -1)
+    [ -n "$TEMPLATE" ] || die "Šablona pro Debian $OSVERSION a $ARCH není k dispozici."
+
     msg "Stahuji $TEMPLATE (asi 120 MB, chvíli to trvá)"
-    pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null
+    pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null \
+        || die "Stažení šablony selhalo."
+    ok "Šablona $TEMPLATE"
 fi
-ok "Šablona $TEMPLATE"
 
 msg "Zakládám kontejner"
 pct create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
