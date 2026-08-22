@@ -124,34 +124,52 @@ a ani jedno nasazení ji nijak nezabezpečuje. Do internetu to nepatří.
 
 ### Proxmox (LXC)
 
-Skript se pouští v terminálu uzlu Proxmoxu jako root. Založí kontejner,
+Jeden příkaz v terminálu uzlu Proxmoxu, jako root. Založí kontejner,
 nastaví ho, stáhne poslední vydanou binárku, ověří kontrolní součet a zapne
 službu:
 
 ```bash
-bash deploy/pve-kostky.sh
+bash -c "$(curl -fsSL https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/pve-kostky.sh)"
 ```
 
 Na konci vypíše adresu, na které počitadlo poslouchá. Výchozí nastavení je
-1 jádro, 512 MB, 4 GB disku a Debian 13; přebíjí se proměnnými:
+1 jádro, 512 MB, 4 GB disku a Debian 13; úložiště si najde samo. Přebíjí se
+proměnnými před příkazem:
 
 ```bash
-MEMORY=1024 STORAGE=local-zfs PORT=8080 bash deploy/pve-kostky.sh
+MEMORY=1024 STORAGE=local-zfs PORT=8080 bash -c "$(curl -fsSL ...)"
 ```
 
-Aktualizace na novější vydání je totéž s číslem kontejneru:
+| Proměnná | Výchozí |
+|---|---|
+| `CTID` | první volné číslo |
+| `CT_HOSTNAME` | `kostky` |
+| `CORES`, `MEMORY`, `DISK` | `1`, `512`, `4` |
+| `STORAGE` | první aktivní úložiště pro kontejnery |
+| `TEMPLATE_STORAGE`, `BRIDGE` | `local`, `vmbr0` |
+| `PORT` | `8000` |
+| `UNPRIVILEGED`, `OSVERSION` | `1`, `13` |
+| `VERSION` | poslední vydání |
+
+Aktualizace na novější vydání je ten samý příkaz s číslem kontejneru:
 
 ```bash
-bash deploy/pve-kostky.sh update 123
+CTID=123 MODE=update bash -c "$(curl -fsSL ...)"
 ```
 
 Podoba je odkoukaná od [community-scripts.org](https://community-scripts.org),
 ale nic z jejich frameworku se nestahuje — jejich `build.func` si instalační
 skript hledá natvrdo ve vlastním repozitáři, takže mimo něj nefunguje.
 
-`deploy/lxc-install.sh` o Proxmoxu nic neví, takže se dá pustit i v LXC nebo
-virtuálu, který sis založil sám. Je idempotentní; druhé spuštění jen vymění
-binárku za nejnovější.
+Instalátor, který běží uvnitř kontejneru, je ve skriptu vložený jako text —
+přes rouru z curlu na disku hostitele žádný druhý soubor není. O Proxmoxu nic
+neví, takže se dá použít i v kontejneru, který sis založil sám:
+
+```bash
+bash pve-kostky.sh instalator > install.sh
+```
+
+Je idempotentní; druhé spuštění jen vymění binárku za nejnovější.
 
 ### Docker
 
