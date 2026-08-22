@@ -55,7 +55,13 @@ jobs:
         run: uv run --with-requirements requirements-dev.txt --no-project pytest -q
 
       - name: Binárka
-        run: ./build.sh
+        run: |
+          # Na tagu je verze jistá. Jinde je repozitář naklonovaný mělce
+          # a build.sh si vystačí s tím, co z gitu vyčte.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+              export VERSION="$GITHUB_REF_NAME"
+          fi
+          ./build.sh
 
       - name: Zkouška
         run: |
@@ -74,6 +80,10 @@ jobs:
           curl -sf -o /dev/null "http://127.0.0.1:8123/static/style.css"
           curl -sf "http://127.0.0.1:8123/board" | grep -q "127.0.0.1:8123"
           test -f zkouska/dice.db
+
+          # Verze se musí do binárky opravdu dostat, ne se hlásit jako neznámá.
+          "${{ matrix.built }}" --version
+          ! "${{ matrix.built }}" --version | grep -q "neznámá"
 
           echo "Binárka jede."
 

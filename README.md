@@ -59,11 +59,16 @@ Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará sám.
 Server vypíše všechny adresy, na kterých je dostupný:
 
 ```
+Kostky v1.1.0
+
 Počitadlo je dostupné na:
  → http://10.186.234.182:8000     místní síť
    http://100.91.0.24:8000        přes Tailscale
    http://172.17.0.1:8000         virtuální síť
 ```
+
+Kterou verzi máš, řekne i `kostky --version`; visí taky v patičce každé
+stránky. Když něco nefunguje, je to první věc, na kterou se zeptám.
 
 Na notebooku otevři `/board`, naskenuj QR kód telefonem a hraj. Tabule
 nabízí i zbylé adresy — když jedna nefunguje, klikni na jinou a QR kód se
@@ -138,6 +143,7 @@ při remíze na prvním místě se hraje dál.
 | `web.py` | Flask aplikace |
 | `dice.py` | totéž v terminálu, bez ukládání |
 | `console.py` | aby čeština prošla i windowsovou konzolí |
+| `version.py` | která verze to je — z gitu, nebo z binárky |
 | `build.sh`, `kostky.spec` | stavba binárky |
 | `.gitea/workflows/` | testy a linuxová binárka doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
@@ -194,6 +200,11 @@ srovnat.
 ```bash
 ./build.sh
 ```
+
+Verzi si `build.sh` vezme z `git describe`, nebo se dá vnutit přes
+`VERSION=v1.2.3 ./build.sh`. Zapíše ji do `verze.txt`, `kostky.spec` ji
+přibalí a binárka ji pak umí ohlásit i na cizím počítači, kde žádný git není.
+Verzi Pythonu, proti kterému se staví, přebíjí `PYTHON_VERSION`.
 
 Staví se proti samostatnému CPythonu od `uv`, ne proti systémovému. Ten je
 slinkovaný s glibc 2.17; postavené proti Pythonu z Fedory 44 by to chtělo

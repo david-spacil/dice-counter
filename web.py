@@ -22,6 +22,7 @@ import console
 import net
 import stats
 import storage
+import version
 from core import FINAL_SCORE, Game, GameOver
 
 def bundled(folder: str) -> str:
@@ -123,6 +124,12 @@ def qr_svg(data: str) -> Markup:
         f'aria-label="QR kód s adresou {escape(data)}" '
         f'shape-rendering="crispEdges">{"".join(rects)}</svg>'
     )
+
+
+@app.context_processor
+def verze():
+    """Verze do patičky. Když někdo hlásí chybu, tohle je první otázka."""
+    return {"verze": version.current()}
 
 
 @app.template_filter("datum")
@@ -320,8 +327,9 @@ def hall():
                            games=storage.recent_games(conn))
 
 
-if __name__ == "__main__":
-    console.utf8()
+def announce() -> None:
+    """Vypíše, kde všude je počitadlo k mání, a čím je zrovna spuštěné."""
+    print(f"Kostky {version.current()}\n")
 
     found = net.addresses()
 
@@ -336,4 +344,13 @@ if __name__ == "__main__":
 
     print(f"\nDatabáze: {storage.DB_PATH.resolve()}")
 
+
+if __name__ == "__main__":
+    console.utf8()
+
+    if {"--version", "-V"} & set(sys.argv[1:]):
+        print(f"kostky {version.current()}")
+        sys.exit(0)
+
+    announce()
     app.run(host="0.0.0.0", port=PORT, threaded=True)

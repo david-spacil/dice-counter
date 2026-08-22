@@ -12,11 +12,18 @@
 # se do ní nedostane, takže kontejner k tomu není potřeba.
 set -euo pipefail
 
-VERSION=${VERSION:-3.11}
+PYTHON_VERSION=${PYTHON_VERSION:-3.11}
 BUILD=${BUILD:-.build}
 
-uv python install "$VERSION"
-uv venv --quiet --managed-python --python "$VERSION" "$BUILD"
+# Verze, kterou binárka ohlásí přes --version. V CI ji na tagu vnutíme
+# proměnnou, protože tam je repozitář naklonovaný na jeden commit a git
+# describe nemá o co se opřít.
+VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo neznámá)}
+printf '%s\n' "$VERSION" > verze.txt
+echo "Verze: $VERSION"
+
+uv python install "$PYTHON_VERSION"
+uv venv --quiet --managed-python --python "$PYTHON_VERSION" "$BUILD"
 
 # Windows dává spustitelné soubory venvu do Scripts/, zbytek světa do bin/.
 python="$BUILD/bin/python"

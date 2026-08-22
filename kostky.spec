@@ -5,12 +5,19 @@ Staví se přes `./build.sh`, ne ručně — ta se stará o to, aby výsledek je
 i na starších systémech, než je ten tvůj.
 """
 
+import os
 import sys
+
+# Verzi zapisuje build.sh těsně před stavbou. Když se pyinstaller pustí
+# ručně bez ní, binárka se postaví taky — jen se pak hlásí jako neznámá.
+datas = [("templates", "templates"), ("static", "static")]
+if os.path.exists("verze.txt"):
+    datas.append(("verze.txt", "."))
 
 analysis = Analysis(
     ["web.py"],
     pathex=["."],
-    datas=[("templates", "templates"), ("static", "static")],
+    datas=datas,
     noarchive=False,
 )
 

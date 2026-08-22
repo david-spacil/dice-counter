@@ -56,7 +56,13 @@ jobs:
         run: uv run --with-requirements requirements-dev.txt --no-project pytest -q
 
       - name: Binárka
-        run: ./build.sh
+        run: |
+          # Runner klonuje jeden commit bez značek, takže si git describe
+          # nemá o co opřít — na tagu mu verzi řekneme rovnou.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+              export VERSION="$GITHUB_REF_NAME"
+          fi
+          ./build.sh
 
       - name: Zkouška
         run: |
@@ -74,6 +80,7 @@ jobs:
           curl -sf -o /dev/null http://127.0.0.1:8321/static/style.css
           curl -sf -o /dev/null http://127.0.0.1:8321/board
           test -f /tmp/zkouska/kostky/dice.db
+          ./dist/kostky --version
           cat /tmp/server.log
 
       - name: Na release
