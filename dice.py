@@ -12,6 +12,7 @@ from os import name, system
 
 from tabulate import tabulate
 
+import console
 from core import FINAL_SCORE, Game
 
 table_header = ["Hráč", "Skóre"]
@@ -128,4 +129,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    console.utf8()
     main()
