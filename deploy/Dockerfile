@@ -5,7 +5,7 @@
 # proběhl. Závislosti jsou zamčené v requirements.txt, takže je sestavení
 # opakovatelné.
 #
-#     docker build -f deploy/Dockerfile -t kostky .
+#     docker build -f deploy/Dockerfile -t gitea.spacilovi.eu/david-spacil/dice-counter:latest .
 #
 # Sestavuje se z kořene repozitáře, ne z deploy/.
 FROM python:3.11-slim
@@ -13,7 +13,7 @@ FROM python:3.11-slim
 # Verze se jinak nemá kde vzít — v image není git ani zabalená binárka.
 ARG VERSION=neznámá
 
-RUN useradd --system --uid 1000 --home-dir /app --shell /usr/sbin/nologin kostky
+RUN useradd --system --uid 1000 --home-dir /app --shell /usr/sbin/nologin dice-counter
 
 WORKDIR /app
 
@@ -29,15 +29,15 @@ RUN echo "$VERSION" > verze.txt
 
 # Adresář pro databázi musí vzniknout už tady a patřit správnému uživateli —
 # svazek, který Docker založí sám, by jinak patřil rootovi a appka běžící pod
-# kostky by do něj nezapsala.
-RUN install -d -o kostky -g kostky /data
+# dice-counter by do něj nezapsala.
+RUN install -d -o dice-counter -g dice-counter /data
 VOLUME ["/data"]
 
 ENV DICE_DB=/data/dice.db \
     DICE_PORT=8000
 
 EXPOSE 8000
-USER kostky
+USER dice-counter
 
 # Bez curlu, ten ve slim image není. Stačí, že stránka odpoví — sahá i do
 # databáze, takže se tím kontroluje i ta.

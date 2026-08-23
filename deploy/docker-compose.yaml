@@ -12,9 +12,9 @@
 # nezabezpečuje a do internetu nepatří.
 
 services:
-  kostky:
+  dice-counter:
     image: gitea.spacilovi.eu/david-spacil/dice-counter:latest
-    container_name: kostky
+    container_name: dice-counter
     restart: unless-stopped
 
     # Python jako PID 1 nesklízí osiřelé procesy a hůř reaguje na signály.
@@ -39,8 +39,8 @@ services:
       DICE_DB: /data/dice.db
 
     volumes:
-      - kostky-data:/data
+      - dice-counter-data:/data
 
 volumes:
   # Zálohu si stáhneš rovnou z appky přes /export, takže se sem nemusí lézt.
-  kostky-data:
+  dice-counter-data:
