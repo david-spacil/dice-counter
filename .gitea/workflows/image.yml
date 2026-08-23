@@ -56,11 +56,26 @@ jobs:
       - name: Builder
         run: |
           # Výchozí ovladač Dockeru multiplatformní stavbu neumí, je potřeba
-          # docker-container. Krok se pouští opakovaně, tak ať nevadí, že
-          # builder z minula už existuje.
-          docker buildx create --name kostky --driver docker-container --use \
-              2>/dev/null || docker buildx use kostky
-          docker buildx inspect --bootstrap | head -20
+          # docker-container. Staví se pokaždé načisto — builder z minulého
+          # běhu by si pamatoval platformy z doby před registrací emulace.
+          #
+          # Bez roury do `head`: pod pipefail by zavřená roura shodila celý
+          # krok dřív, než docker dopíše výstup.
+          docker buildx rm kostky >/dev/null 2>&1 || true
+          docker buildx create --name kostky --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+          # Kdyby arm64 v seznamu chybělo, stavba spadne až na konci a hláška
+          # nic neřekne. Radši to zkontrolujeme hned.
+          PLATFORMY=$(docker buildx inspect)
+          echo "$PLATFORMY" | grep -q "linux/arm64" || {
+              echo "Buildkit nevidí linux/arm64, i když se binfmt nainstaloval." >&2
+              echo "Emulace musí být registrovaná s příznakem F, jinak si na ni" >&2
+              echo "buildkit ze svého kontejneru nesáhne. Na runneru to natrvalo" >&2
+              echo "vyřeší balíček qemu-user-static." >&2
+              echo "--- současná registrace ---" >&2
+              cat /proc/sys/fs/binfmt_misc/qemu-aarch64 >&2 2>/dev/null || echo "(žádná)" >&2
+              exit 1; }
 
       - name: Zkouška
         run: |
