@@ -38,7 +38,7 @@ fi
 uv pip install --quiet --python "$python" -r requirements-build.txt
 
 "$pyinstaller" --clean --noconfirm \
-    --distpath dist --workpath "$BUILD/work" kostky.spec
+    --distpath dist --workpath "$BUILD/work" dice-counter.spec
 
 echo
 ls -lh dist/

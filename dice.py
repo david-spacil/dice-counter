@@ -134,7 +134,7 @@ if __name__ == "__main__":
     console.utf8()
 
     if {"--version", "-V"} & set(sys.argv[1:]):
-        print(f"kostky {version.current()}")
+        print(f"dice-counter {version.current()}")
         sys.exit(0)
 
     main()

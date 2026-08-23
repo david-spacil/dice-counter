@@ -17,7 +17,7 @@ UNKNOWN = "neznámá"
 def bundled() -> str:
     """Verze vypálená do binárky při stavbě.
 
-    `build.sh` ji zapíše do souboru, `kostky.spec` ji přibalí. V binárce
+    `build.sh` ji zapíše do souboru, `dice-counter.spec` ji přibalí. V binárce
     leží vedle šablon v dočasném adresáři, na který ukazuje `sys._MEIPASS`.
     """
     root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))

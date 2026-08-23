@@ -28,7 +28,7 @@ exe = EXE(
     analysis.scripts,
     analysis.binaries,
     analysis.datas,
-    name="kostky",
+    name="dice-counter",
     console=True,
     # Ořezání symbolů šetří pár megabajtů, ale jen na Linuxu. Na macOS by
     # rozbilo podpis, který si PyInstaller sám přidává a bez kterého se

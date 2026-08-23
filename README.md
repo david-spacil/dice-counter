@@ -13,19 +13,19 @@ Stáhni binárku pro svůj systém z
 
 | Systém | Soubor |
 |---|---|
-| Linux (x86-64) | `kostky-linux-x86_64` |
-| Linux (ARM64) | `kostky-linux-arm64` |
-| macOS (Apple Silicon) | `kostky-macos-arm64` |
-| macOS (Intel) | `kostky-macos-x86_64` |
-| Windows (x86-64) | `kostky-windows-x86_64.exe` |
+| Linux (x86-64) | `dice-counter-linux-x86_64` |
+| Linux (ARM64) | `dice-counter-linux-arm64` |
+| macOS (Apple Silicon) | `dice-counter-macos-arm64` |
+| macOS (Intel) | `dice-counter-macos-x86_64` |
+| Windows (x86-64) | `dice-counter-windows-x86_64.exe` |
 
 Nic se neinstaluje — Python, Flask i šablony jsou uvnitř.
 
 Na Linuxu a macOS:
 
 ```bash
-chmod +x kostky-*
-./kostky-linux-x86_64
+chmod +x dice-counter-*
+./dice-counter-linux-x86_64
 ```
 
 Na Windows stačí na `.exe` poklepat.
@@ -38,7 +38,7 @@ Binárky nejsou podepsané — podpisové certifikáty stojí tisíce ročně a 
 počitadlo kostek by to byl nesmysl. Systémy si toho všimnou:
 
 - **macOS** stažený soubor označí za karanténní a odmítne ho spustit. Buď
-  značku sundej (`xattr -dr com.apple.quarantine kostky-macos-arm64`), nebo
+  značku sundej (`xattr -dr com.apple.quarantine dice-counter-macos-arm64`), nebo
   soubor stáhni rovnou z terminálu přes `curl -LO` — tudy se karanténa
   nenastavuje.
 - **Windows** ukáže modré okno SmartScreenu. *Další informace* →
@@ -60,7 +60,7 @@ Závislosti si skript nese v hlavičce (PEP 723) a `uv` je obstará sám.
 Server vypíše všechny adresy, na kterých je dostupný:
 
 ```
-Kostky v1.1.0
+dice-counter v1.2.2
 
 Počitadlo je dostupné na:
  → http://10.186.234.182:8000     místní síť
@@ -68,7 +68,7 @@ Počitadlo je dostupné na:
    http://172.17.0.1:8000         virtuální síť
 ```
 
-Kterou verzi máš, řekne i `kostky --version`; visí taky v patičce každé
+Kterou verzi máš, řekne i `dice-counter --version`; visí taky v patičce každé
 stránky. Když něco nefunguje, je to první věc, na kterou se zeptám.
 
 Na notebooku otevři `/board`, naskenuj QR kód telefonem a hraj. Tabule
@@ -88,10 +88,14 @@ server vypíše při startu.
 
 | Spuštěno | Databáze |
 |---|---|
-| binárkou na Linuxu | `~/.local/share/kostky/dice.db` |
-| binárkou na macOS | `~/Library/Application Support/kostky/dice.db` |
-| binárkou na Windows | `%LOCALAPPDATA%\kostky\dice.db` |
+| binárkou na Linuxu | `~/.local/share/dice-counter/dice.db` |
+| binárkou na macOS | `~/Library/Application Support/dice-counter/dice.db` |
+| binárkou na Windows | `%LOCALAPPDATA%\dice-counter\dice.db` |
 | ze zdrojáků | `dice.db` v pracovním adresáři |
+
+Do vydání 1.2.x se adresář jmenoval `kostky`. Kdo databázi po staru má, o ni
+nepřijde — dokud nová neexistuje, používá se dál ta stará. Přesunout se dá
+kdykoli ručně, přejmenováním adresáře.
 
 Binárka se při každém spuštění rozbaluje do dočasného adresáře a pouští se
 odkudkoli, takže relativní cesta by databázi rozsypala po disku — proto
@@ -129,7 +133,7 @@ nastaví ho, stáhne poslední vydanou binárku, ověří kontrolní součet a z
 službu:
 
 ```bash
-bash -c "$(curl -fsSL https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/pve-kostky.sh)"
+bash -c "$(curl -fsSL https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/pve-dice-counter.sh)"
 ```
 
 Na konci vypíše adresu, na které počitadlo poslouchá. Výchozí nastavení je
@@ -143,7 +147,7 @@ MEMORY=1024 STORAGE=local-zfs PORT=8080 bash -c "$(curl -fsSL ...)"
 | Proměnná | Výchozí |
 |---|---|
 | `CTID` | první volné číslo |
-| `CT_HOSTNAME` | `kostky` |
+| `CT_HOSTNAME` | `dice-counter` |
 | `CORES`, `MEMORY`, `DISK` | `1`, `512`, `4` |
 | `STORAGE` | první aktivní úložiště pro kontejnery |
 | `TEMPLATE_STORAGE`, `BRIDGE` | `local`, `vmbr0` |
@@ -170,6 +174,13 @@ Obojí vymění binárku za poslední vydání a službu restartuje; databáze z
 Příkaz `update` si přitom obnoví i sám sebe — instalátor bere z větve `main`,
 takže jede na nejnovější verzi skriptu, ne na té, se kterou se instalovalo.
 
+Kontejnery založené do vydání 1.2.x se při první aktualizaci přejmenují ze
+starého `kostky`: služba, uživatel i cesty dostanou nová jména a databáze se
+přestěhuje z `/var/lib/kostky` do `/var/lib/dice-counter`. Dělá se to samo
+a stačí na to obyčejný `update`; historie her zůstává. Původní adresa skriptu
+(`deploy/pve-kostky.sh`) proto ještě chvíli funguje — jen přesměrovává na
+novou.
+
 Do konzole kontejneru se dostaneš přímo z webu Proxmoxu, **žádné jméno ani
 heslo se nezadává** — kontejner root heslo nemá a konzole se přihlašuje sama.
 Nová práva to nikomu nedává: kdo se dostane do webu Proxmoxu, má root na uzlu
@@ -185,7 +196,7 @@ přes rouru z curlu na disku hostitele žádný druhý soubor není. O Proxmoxu 
 neví, takže se dá použít i v kontejneru, který sis založil sám:
 
 ```bash
-bash pve-kostky.sh instalator > install.sh
+bash pve-dice-counter.sh instalator > install.sh
 ```
 
 Je idempotentní; druhé spuštění jen vymění binárku za nejnovější.
@@ -223,7 +234,7 @@ Kdo bridge potřebuje, musí nastavit `DICE_HOST` na adresu hostitele v LAN.
 | | LXC | Docker |
 |---|---|---|
 | Odkud | vydaná binárka z releasu | image z registru |
-| Databáze | `/var/lib/kostky/dice.db` | svazek `kostky-data` |
+| Databáze | `/var/lib/dice-counter/dice.db` | svazek `dice-counter-data` |
 | Aktualizace | `update` uvnitř kontejneru | `docker compose pull` |
 | Adresa a QR | funguje samo | potřeba síť hostitele |
 
@@ -262,7 +273,7 @@ při remíze na prvním místě se hraje dál.
 | `dice.py` | totéž v terminálu, bez ukládání |
 | `console.py` | aby čeština prošla i windowsovou konzolí |
 | `version.py` | která verze to je — z gitu, nebo z binárky |
-| `build.sh`, `kostky.spec` | stavba binárky |
+| `build.sh`, `dice-counter.spec` | stavba binárky |
 | `.gitea/workflows/` | testy, linuxová binárka a zkouška image doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
 | `deploy/` | nasazení na server: Proxmox LXC a Docker |
@@ -321,7 +332,7 @@ srovnat.
 ```
 
 Verzi si `build.sh` vezme z `git describe`, nebo se dá vnutit přes
-`VERSION=v1.2.3 ./build.sh`. Zapíše ji do `verze.txt`, `kostky.spec` ji
+`VERSION=v1.2.3 ./build.sh`. Zapíše ji do `verze.txt`, `dice-counter.spec` ji
 přibalí a binárka ji pak umí ohlásit i na cizím počítači, kde žádný git není.
 Verzi Pythonu, proti kterému se staví, přebíjí `PYTHON_VERSION`.
 
@@ -366,8 +377,12 @@ ji kamkoli pověsí. Vedle každé visí i `.sha256`, takže se stažený soubor
 ověřit:
 
 ```bash
-sha256sum -c kostky-linux-x86_64.sha256     # na macOS: shasum -a 256 -c
+sha256sum -c dice-counter-linux-x86_64.sha256   # na macOS: shasum -a 256 -c
 ```
+
+Do vydání 1.2.x se přílohy jmenovaly `kostky-*`. Ještě chvíli se budou věšet
+pod oběma jmény, ať fungují instalace, které si o ně říkají po staru. Až budou
+přemigrované, zůstane jen `dice-counter-*`.
 
 Nad pull requesty se Linux staví taky, jen se nikam nevěší. Totéž platí pro
 kontejnerový image — doma se nad každým PR postaví a zkusí nastartovat
