@@ -350,7 +350,7 @@ def export():
 
     return send_file(io.BytesIO(data), mimetype="application/vnd.sqlite3",
                      as_attachment=True,
-                     download_name=f"kostky-{date.today().isoformat()}.db")
+                     download_name=f"dice-counter-{date.today().isoformat()}.db")
 
 
 @app.route("/stats")
@@ -364,7 +364,7 @@ def hall():
 
 def announce() -> None:
     """Vypíše, kde všude je počitadlo k mání, a čím je zrovna spuštěné."""
-    print(f"Kostky {version.current()}\n")
+    print(f"dice-counter {version.current()}\n")
 
     found = net.addresses()
 
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     console.utf8()
 
     if {"--version", "-V"} & set(sys.argv[1:]):
-        print(f"kostky {version.current()}")
+        print(f"dice-counter {version.current()}")
         sys.exit(0)
 
     announce()

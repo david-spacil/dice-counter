@@ -66,10 +66,15 @@ jobs:
 
       - name: Zkouška
         run: |
-          XDG_DATA_HOME=/tmp/zkouska DICE_PORT=8321 DICE_HOST=127.0.0.1 \
-              ./dist/kostky > /tmp/server.log 2>&1 &
+          # Vlastní adresář pro každý běh. Runner si /tmp mezi běhy drží
+          # a binárka umí sáhnout po databázi ve starém umístění, takže
+          # zbytek po dřívější zkoušce by tuhle poslal vedle.
+          XDG=$(mktemp -d)
+
+          XDG_DATA_HOME="$XDG" DICE_PORT=8321 DICE_HOST=127.0.0.1 \
+              ./dist/dice-counter > /tmp/server.log 2>&1 &
           server=$!
-          trap 'kill $server 2>/dev/null || true' EXIT
+          trap 'kill $server 2>/dev/null || true; rm -rf "$XDG"' EXIT
 
           for _ in $(seq 30); do
               curl -sf -o /dev/null http://127.0.0.1:8321/ && break
@@ -79,15 +84,18 @@ jobs:
           curl -sf -o /dev/null http://127.0.0.1:8321/
           curl -sf -o /dev/null http://127.0.0.1:8321/static/style.css
           curl -sf -o /dev/null http://127.0.0.1:8321/board
-          test -f /tmp/zkouska/kostky/dice.db
-          ./dist/kostky --version
+          test -f "$XDG/dice-counter/dice.db"
+          ./dist/dice-counter --version
           cat /tmp/server.log
 
       - name: Na release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ASSET: kostky-linux-x86_64
+          ASSET: dice-counter-linux-x86_64
+          # Instalátory z dřívějška si chodí pro staré jméno. Až budou
+          # přemigrované, přestane se pod ním věšet.
+          STARY_ASSET: kostky-linux-x86_64
         run: |
           api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           auth="Authorization: token ${TOKEN}"
@@ -104,11 +112,13 @@ jobs:
           fi
 
           # Součet se počítá nad jménem, pod kterým se soubor stahuje, aby
-          # šel ověřit rovnou: sha256sum -c kostky-linux-x86_64.sha256
-          cp dist/kostky "$ASSET"
-          sha256sum "$ASSET" | tee "$ASSET.sha256"
+          # šel ověřit rovnou: sha256sum -c dice-counter-linux-x86_64.sha256
+          for jmeno in "$ASSET" "$STARY_ASSET"; do
+              cp dist/dice-counter "$jmeno"
+              sha256sum "$jmeno" | tee "$jmeno.sha256"
+          done
 
-          for file in "$ASSET" "$ASSET.sha256"; do
+          for file in "$ASSET" "$ASSET.sha256" "$STARY_ASSET" "$STARY_ASSET.sha256"; do
               # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
               curl -s -H "$auth" "$api/releases/$id/assets" \
                   | python3 -c 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == sys.argv[1]]' "$file" \
