@@ -192,13 +192,28 @@ Je idempotentní; druhé spuštění jen vymění binárku za nejnovější.
 
 ### Docker
 
+Stačí jeden soubor, repozitář k tomu potřeba není:
+
 ```bash
-cd deploy && docker compose up -d
+curl -fsSLO https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/docker-compose.yaml
+docker compose up -d
 ```
 
-Staví se ze zdrojáků, takže image jde sestavit pro amd64 i arm64 a nezávisí
-na tom, jestli release pro danou architekturu proběhl. Databáze leží
-v pojmenovaném svazku, appka běží pod nerootovým uživatelem.
+Image se stáhne hotový z registru Gitey, pro amd64 i arm64 — Docker si vybere
+svoji variantu sám. Databáze leží v pojmenovaném svazku, appka běží pod
+nerootovým uživatelem.
+
+Aktualizace na novější vydání:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Kdo si ho radši postaví ze zdrojáků, přebije ten stažený stejnou značkou:
+
+```bash
+docker build -f deploy/Dockerfile -t gitea.spacilovi.eu/david-spacil/dice-counter:latest .
+```
 
 **Pozor na síť.** Compose schválně používá `network_mode: host`. V bridge
 režimu kontejner uvnitř vidí adresu jako `172.17.0.2`, tabule ji poctivě
@@ -207,9 +222,9 @@ Kdo bridge potřebuje, musí nastavit `DICE_HOST` na adresu hostitele v LAN.
 
 | | LXC | Docker |
 |---|---|---|
-| Odkud | vydaná binárka z releasu | zdrojáky |
+| Odkud | vydaná binárka z releasu | image z registru |
 | Databáze | `/var/lib/kostky/dice.db` | svazek `kostky-data` |
-| Aktualizace | `pve-kostky.sh update <ctid>` | `docker compose build --pull` |
+| Aktualizace | `update` uvnitř kontejneru | `docker compose pull` |
 | Adresa a QR | funguje samo | potřeba síť hostitele |
 
 ## Když se telefon nepřipojí
@@ -248,7 +263,7 @@ při remíze na prvním místě se hraje dál.
 | `console.py` | aby čeština prošla i windowsovou konzolí |
 | `version.py` | která verze to je — z gitu, nebo z binárky |
 | `build.sh`, `kostky.spec` | stavba binárky |
-| `.gitea/workflows/` | testy a linuxová binárka doma |
+| `.gitea/workflows/` | testy, linuxová binárka a zkouška image doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
 | `deploy/` | nasazení na server: Proxmox LXC a Docker |
 
@@ -331,6 +346,7 @@ Otagovaný commit spustí stavbu na obou stranách:
 |---|---|---|
 | vlastní runner u Gitey | Linux x86-64 | `.gitea/workflows/binarka.yml` |
 | GitHub Actions | Windows, macOS ×2, Linux ARM64 | `.github/workflows/binarky.yml` |
+| GitHub Actions | image amd64 + arm64 | `.github/workflows/image.yml` |
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
@@ -353,7 +369,14 @@ ověřit:
 sha256sum -c kostky-linux-x86_64.sha256     # na macOS: shasum -a 256 -c
 ```
 
-Nad pull requesty se Linux staví taky, jen se nikam nevěší.
+Nad pull requesty se Linux staví taky, jen se nikam nevěší. Totéž platí pro
+kontejnerový image — doma se nad každým PR postaví a zkusí nastartovat
+(`.gitea/workflows/image.yml`), publikuje se ale až z tagu na GitHubu.
+
+Image se schválně nevydává doma: tamní runner běží v LXC, kde nejde
+zaregistrovat emulaci pro arm64 — je to vlastnost jádra hostitele a ten je
+produkční stroj. Běhouni GitHubu jsou plnohodnotné virtuály, kde to funguje
+bez zásahu do čehokoli.
 
 ## Testy
 

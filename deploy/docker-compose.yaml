@@ -1,19 +1,20 @@
 # Počitadlo kostek v Dockeru.
 #
-#     cd deploy && docker compose up -d
+#     curl -fsSLO https://gitea.spacilovi.eu/david-spacil/dice-counter/raw/branch/main/deploy/docker-compose.yaml
+#     docker compose up -d
+#
+# Nic dalšího není potřeba — image se stáhne hotový, pro amd64 i arm64.
+# Kdo si ho chce postavit ze zdrojáků, přebije ten stažený stejnou značkou:
+#
+#     docker build -f deploy/Dockerfile -t gitea.spacilovi.eu/david-spacil/dice-counter:latest .
 #
 # Počítá se s domácí sítí. Appka nemá přihlašování, tohle ji nijak
 # nezabezpečuje a do internetu nepatří.
 
 services:
-  kostky:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        VERSION: ${VERSION:-vlastní sestavení}
-    image: kostky:latest
-    container_name: kostky
+  dice-counter:
+    image: gitea.spacilovi.eu/david-spacil/dice-counter:latest
+    container_name: dice-counter
     restart: unless-stopped
 
     # Python jako PID 1 nesklízí osiřelé procesy a hůř reaguje na signály.
@@ -38,8 +39,8 @@ services:
       DICE_DB: /data/dice.db
 
     volumes:
-      - kostky-data:/data
+      - dice-counter-data:/data
 
 volumes:
   # Zálohu si stáhneš rovnou z appky přes /export, takže se sem nemusí lézt.
-  kostky-data:
+  dice-counter-data:
