@@ -85,7 +85,7 @@ DATA_DIR=/var/lib/dice-counter
 SERVICE=dice-counter
 
 # Do vydání 1.2.x se všechno jmenovalo kostky. Instalace z té doby se při
-# aktualizaci přestěhují; až budou přemigrované, tyhle tři řádky zmizí.
+# aktualizaci přestěhují; až budou přemigrované, tenhle blok zmizí.
 STARY_USER=kostky
 STARY_HOME=/opt/kostky
 STARY_DATA=/var/lib/kostky
