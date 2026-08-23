@@ -1,23 +1,21 @@
-# Postaví kontejnerový image a při vydání ho pošle do registru Gitey.
+# Postaví kontejnerový image a zkusí ho spustit. Nikam ho neposílá.
 #
-# Runner běží v host módu, takže tu nejsou hotové akce z marketplace a všechno
-# je obyčejný shell — stejně jako v ostatních workflow tady. Docker na
-# hostiteli být musí, ten se tu neinstaluje.
+# Dockerfile by se jinak rozbil až ve chvíli, kdy se tagne release — tohle ho
+# ohlídá nad každým pull requestem.
 #
-# Nad pull requesty se image staví a zkouší, ale nikam se neposílá. Dockerfile
-# by se jinak rozbil až ve chvíli, kdy se tagne release.
+# Publikuje se jinde: .github/workflows/image.yml. Zdejší runner běží v LXC,
+# kde nejde zaregistrovat binfmt, takže arm64 by se tu postavit nedalo.
+# Registrace je vlastnost jádra hostitele a to je produkční stroj, do kterého
+# se kvůli počitadlu kostek vrtat nebude.
+#
+# Staví se nativní amd64 obyčejným `docker build`, žádný buildx ani emulace.
 name: image
 
 on:
-  push:
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
 env:
-  REGISTRY: gitea.spacilovi.eu
-  IMAGE: david-spacil/dice-counter
-  PLATFORMS: linux/amd64,linux/arm64
   ZKOUSKA_PORT: "18000"
 
 jobs:
@@ -42,53 +40,21 @@ jobs:
         run: |
           command -v docker >/dev/null \
               || { echo "Docker na runneru není." >&2; exit 1; }
-          docker buildx version >/dev/null 2>&1 \
-              || { echo "Chybí docker buildx — bez něj multiarch nejde." >&2; exit 1; }
           docker version --format '{{.Server.Version}}'
 
-      - name: QEMU pro cizí architektury
+      - name: Stavba
         run: |
-          # Registruje binfmt, aby šlo na x86 stroji stavět i arm64. Všechny
-          # závislosti jsou čistě pythonní, takže se pod emulací nic
-          # nekompiluje a stavba tím prakticky netrpí.
-          docker run --privileged --rm tonistiigi/binfmt --install arm64
-
-      - name: Builder
-        run: |
-          # Výchozí ovladač Dockeru multiplatformní stavbu neumí, je potřeba
-          # docker-container. Staví se pokaždé načisto — builder z minulého
-          # běhu by si pamatoval platformy z doby před registrací emulace.
-          #
-          # Bez roury do `head`: pod pipefail by zavřená roura shodila celý
-          # krok dřív, než docker dopíše výstup.
-          docker buildx rm kostky >/dev/null 2>&1 || true
-          docker buildx create --name kostky --driver docker-container --use
-          docker buildx inspect --bootstrap
-
-          # Kdyby arm64 v seznamu chybělo, stavba spadne až na konci a hláška
-          # nic neřekne. Radši to zkontrolujeme hned.
-          PLATFORMY=$(docker buildx inspect)
-          echo "$PLATFORMY" | grep -q "linux/arm64" || {
-              echo "Buildkit nevidí linux/arm64, i když se binfmt nainstaloval." >&2
-              echo "Emulace musí být registrovaná s příznakem F, jinak si na ni" >&2
-              echo "buildkit ze svého kontejneru nesáhne. Na runneru to natrvalo" >&2
-              echo "vyřeší balíček qemu-user-static." >&2
-              echo "--- současná registrace ---" >&2
-              cat /proc/sys/fs/binfmt_misc/qemu-aarch64 >&2 2>/dev/null || echo "(žádná)" >&2
-              exit 1; }
-
-      - name: Zkouška
-        run: |
-          # Zkouší se nativní amd64: --load umí do místního Dockeru uložit jen
-          # jednu platformu a spustit stejně nic jiného nejde.
-          docker buildx build --platform linux/amd64 --load \
-              -f deploy/Dockerfile \
+          docker build -f deploy/Dockerfile \
               --build-arg VERSION="zkouska-${GITHUB_SHA:0:7}" \
               -t kostky:zkouska .
 
+      - name: Zkouška
+        run: |
           trap 'docker rm -f kostky-zkouska >/dev/null 2>&1 || true' EXIT
 
-          # Adresa se vnucuje, ať zkouška nezávisí na síti běhounu a dá se
+          # Port musí být stejný uvnitř i venku: appka poslouchá na DICE_PORT,
+          # takže mapovat ho na jiný by znamenalo mířit do prázdna.
+          # Adresa se vnucuje, ať zkouška nezávisí na síti runneru a dá se
           # ověřit, co přesně tabule nabídne.
           docker run -d --name kostky-zkouska --init \
               -p "${ZKOUSKA_PORT}:${ZKOUSKA_PORT}" -e DICE_HOST=127.0.0.1 \
@@ -114,29 +80,6 @@ jobs:
           docker logs kostky-zkouska
           echo "Image jede."
 
-      - name: Publikace
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-          VLASTNIK: ${{ github.repository_owner }}
-        run: |
-          # Automatický token Actions na balíčky nestačí — Gitea to zatím
-          # neumí a sama v dokumentaci odkazuje na osobní token. Ten je
-          # v secrets pod PACKAGE_TOKEN; jméno nesmí začínat na GITEA_,
-          # ten prefix si Gitea vyhrazuje.
-          [ -n "$TOKEN" ] || { echo "Chybí secret PACKAGE_TOKEN." >&2; exit 1; }
-          echo "$TOKEN" | docker login "$REGISTRY" -u "$VLASTNIK" --password-stdin
-          trap 'docker logout "$REGISTRY" >/dev/null 2>&1 || true' EXIT
-
-          # Značka bez počátečního "v": v repozitáři je v1.2.0, u image se
-          # čekají 1.2.0.
-          VERZE="${GITHUB_REF_NAME#v}"
-
-          docker buildx build --platform "$PLATFORMS" --push \
-              -f deploy/Dockerfile \
-              --build-arg VERSION="${GITHUB_REF_NAME}" \
-              -t "$REGISTRY/$IMAGE:$VERZE" \
-              -t "$REGISTRY/$IMAGE:latest" .
-
-          echo "Publikováno: $REGISTRY/$IMAGE:$VERZE a :latest"
-          docker buildx imagetools inspect "$REGISTRY/$IMAGE:$VERZE"
+      - name: Úklid
+        if: always()
+        run: docker rmi kostky:zkouska >/dev/null 2>&1 || true

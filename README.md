@@ -263,7 +263,7 @@ při remíze na prvním místě se hraje dál.
 | `console.py` | aby čeština prošla i windowsovou konzolí |
 | `version.py` | která verze to je — z gitu, nebo z binárky |
 | `build.sh`, `kostky.spec` | stavba binárky |
-| `.gitea/workflows/` | testy, linuxová binárka a image doma |
+| `.gitea/workflows/` | testy, linuxová binárka a zkouška image doma |
 | `.github/workflows/` | binárky pro Windows a macOS |
 | `deploy/` | nasazení na server: Proxmox LXC a Docker |
 
@@ -345,8 +345,8 @@ Otagovaný commit spustí stavbu na obou stranách:
 | Kde | Co staví | Workflow |
 |---|---|---|
 | vlastní runner u Gitey | Linux x86-64 | `.gitea/workflows/binarka.yml` |
-| vlastní runner u Gitey | image amd64 + arm64 | `.gitea/workflows/image.yml` |
 | GitHub Actions | Windows, macOS ×2, Linux ARM64 | `.github/workflows/binarky.yml` |
+| GitHub Actions | image amd64 + arm64 | `.github/workflows/image.yml` |
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
@@ -369,7 +369,14 @@ ověřit:
 sha256sum -c kostky-linux-x86_64.sha256     # na macOS: shasum -a 256 -c
 ```
 
-Nad pull requesty se Linux staví taky, jen se nikam nevěší.
+Nad pull requesty se Linux staví taky, jen se nikam nevěší. Totéž platí pro
+kontejnerový image — doma se nad každým PR postaví a zkusí nastartovat
+(`.gitea/workflows/image.yml`), publikuje se ale až z tagu na GitHubu.
+
+Image se schválně nevydává doma: tamní runner běží v LXC, kde nejde
+zaregistrovat emulaci pro arm64 — je to vlastnost jádra hostitele a ten je
+produkční stroj. Běhouni GitHubu jsou plnohodnotné virtuály, kde to funguje
+bez zásahu do čehokoli.
 
 ## Testy
 

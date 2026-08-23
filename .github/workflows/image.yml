@@ -1,0 +1,79 @@
+# Publikuje kontejnerový image do registru balíčků Gitey, pro amd64 i arm64.
+#
+# Proč zrovna odsud: domácí runner běží v LXC, kde nejde zaregistrovat binfmt
+# — je to vlastnost jádra hostitele a ten je produkční. Běhouni GitHubu jsou
+# plnohodnotné virtuály, kde emulace funguje bez řečí.
+#
+# Doma se image přesto staví a zkouší nad každým pull requestem
+# (.gitea/workflows/image.yml), jen se nikam neposílá. Stejná dělba jako
+# u binárek: doma se hlídá, tady se vydává.
+name: image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: gitea.spacilovi.eu
+  IMAGE: david-spacil/dice-counter
+  PLATFORMS: linux/amd64,linux/arm64
+
+jobs:
+  publikace:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Přesná verze, ne plovoucí značka — viz binarky.yml.
+      - uses: actions/checkout@v7.0.1
+
+      - name: QEMU pro arm64
+        run: |
+          # Bez hotové akce z marketplace, ať není co udržovat. Běhoun je
+          # virtuál, takže privilegovaný kontejner smí zapisovat do binfmt
+          # a registrace platí pro celé jádro.
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Builder
+        run: |
+          # Výchozí ovladač Dockeru multiplatformní stavbu neumí.
+          docker buildx create --name kostky --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+          # Bez tohohle by stavba spadla až na konci a hláška by nic neřekla.
+          PLATFORMY=$(docker buildx inspect)
+          echo "$PLATFORMY" | grep -q "linux/arm64" || {
+              echo "Buildkit nevidí linux/arm64, emulace se nezaregistrovala." >&2
+              exit 1; }
+
+      - name: Publikace
+        env:
+          TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+          # Uživatel v Gitee, ne na GitHubu. Shodou okolností je to totéž.
+          VLASTNIK: david-spacil
+        run: |
+          # Spouští se to i ručně, a to klidně nad větví. Bez tagu není z čeho
+          # udělat verzi a `:latest` by ukazoval na rozdělanou práci.
+          [ "$GITHUB_REF_TYPE" = tag ] || {
+              echo "Publikovat jde jen z tagu, tohle je ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}." >&2
+              exit 1; }
+
+          # Automatický token na balíčky nestačí ani u Gitey samotné, natož
+          # odsud — musí to být osobní token s oprávněním write:package.
+          [ -n "$TOKEN" ] || { echo "Chybí secret PACKAGE_TOKEN." >&2; exit 1; }
+          echo "$TOKEN" | docker login "$REGISTRY" -u "$VLASTNIK" --password-stdin
+          trap 'docker logout "$REGISTRY" >/dev/null 2>&1 || true' EXIT
+
+          # Značka bez počátečního "v": v repozitáři je v1.2.0, u image se
+          # čeká 1.2.0. Verze vypálená do image ale zůstává s "v", ať --version
+          # hlásí totéž co binárky.
+          VERZE="${GITHUB_REF_NAME#v}"
+
+          docker buildx build --platform "$PLATFORMS" --push \
+              -f deploy/Dockerfile \
+              --build-arg VERSION="${GITHUB_REF_NAME}" \
+              -t "$REGISTRY/$IMAGE:$VERZE" \
+              -t "$REGISTRY/$IMAGE:latest" .
+
+          echo "Publikováno: $REGISTRY/$IMAGE:$VERZE a :latest"
+          docker buildx imagetools inspect "$REGISTRY/$IMAGE:$VERZE"
