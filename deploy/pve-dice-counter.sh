@@ -84,20 +84,13 @@ HOME_DIR=/opt/dice-counter
 DATA_DIR=/var/lib/dice-counter
 SERVICE=dice-counter
 
-# Do vydání 1.2.x se všechno jmenovalo kostky. Instalace z té doby se při
-# aktualizaci přestěhují; až budou přemigrované, tenhle blok zmizí.
-STARY_USER=kostky
-STARY_HOME=/opt/kostky
-STARY_DATA=/var/lib/kostky
-STARA_SLUZBA=kostky
-
 msg() { echo -e "\e[1;34m  →\e[0m $*"; }
 ok()  { echo -e "\e[1;32m  ✓\e[0m $*"; }
 die() { echo -e "\e[1;31m  ✗\e[0m $*" >&2; exit 1; }
 
 case "$(dpkg --print-architecture)" in
-    amd64) PLATFORMA=linux-x86_64 ;;
-    arm64) PLATFORMA=linux-arm64 ;;
+    amd64) ASSET=dice-counter-linux-x86_64 ;;
+    arm64) ASSET=dice-counter-linux-arm64 ;;
     *)     die "Pro architekturu $(dpkg --print-architecture) binárka není." ;;
 esac
 
@@ -114,22 +107,15 @@ if [ -z "$VERSION" ]; then
         | grep -o '"tag_name":[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4)
     [ -n "$VERSION" ] || die "Nepodařilo se zjistit poslední verzi z $GITEA."
 fi
-ok "Instaluje se $VERSION pro $PLATFORMA"
+ok "Instaluje se $VERSION ($ASSET)"
 
 BASE="$GITEA/$REPO/releases/download/$VERSION"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 msg "Stahuji binárku"
-# Do vydání 1.2.x se přílohy jmenovaly kostky-*. Starší vydání se tak dají
-# nainstalovat dál; až stará jména z releasů zmizí, zůstane jen to první.
-ASSET=""
-for jmeno in "dice-counter-$PLATFORMA" "kostky-$PLATFORMA"; do
-    curl -fsSL -o "$TMP/$jmeno" "$BASE/$jmeno" 2>/dev/null && { ASSET="$jmeno"; break; }
-done
-[ -n "$ASSET" ] \
-    || die "Binárka pro $PLATFORMA ve vydání $VERSION není. Pro tuhle architekturu možná ještě nevyšla."
-
+curl -fsSL -o "$TMP/$ASSET" "$BASE/$ASSET" \
+    || die "$ASSET pro $VERSION na releasu není. Vydání pro tuhle architekturu možná ještě neproběhlo."
 curl -fsSL -o "$TMP/$ASSET.sha256" "$BASE/$ASSET.sha256" \
     || die "Chybí kontrolní součet — radši nic neinstaluju."
 
@@ -142,38 +128,6 @@ id -u "$USER_NAME" >/dev/null 2>&1 \
     || useradd --system --home-dir "$HOME_DIR" --shell /usr/sbin/nologin "$USER_NAME"
 
 install -d -o root -g root -m 755 "$HOME_DIR"
-
-# Instalace z doby, kdy se všechno jmenovalo kostky, se tady převezme. Bez
-# přestěhování databáze by po aktualizaci zmizela historie her, takže se to
-# nedá odbýt smazáním staré služby.
-#
-# Starý domovský adresář se maže až úplně na konci skriptu: při aktualizaci
-# běžícího kontejneru se instalátor pouští právě z něj a `$0` z něj ještě
-# potřebujeme zkopírovat na nové místo.
-if [ -f "/etc/systemd/system/$STARA_SLUZBA.service" ] \
-    || [ -d "$STARY_HOME" ] || [ -d "$STARY_DATA" ]; then
-    msg "Našel jsem instalaci pod starým jménem, stěhuji ji"
-
-    systemctl is-active --quiet "$STARA_SLUZBA" && systemctl stop "$STARA_SLUZBA"
-    systemctl disable --quiet "$STARA_SLUZBA" 2>/dev/null || true
-    rm -f "/etc/systemd/system/$STARA_SLUZBA.service"
-    systemctl daemon-reload
-
-    # Když nový adresář z nějakého důvodu už existuje, starý se nechá být.
-    # Přepsat cizí databázi je horší než nechat po sobě adresář navíc.
-    if [ -d "$STARY_DATA" ] && [ ! -e "$DATA_DIR" ]; then
-        mv "$STARY_DATA" "$DATA_DIR"
-        ok "Databáze přestěhována do $DATA_DIR"
-    elif [ -d "$STARY_DATA" ]; then
-        msg "$DATA_DIR už existuje, $STARY_DATA nechávám na místě"
-    fi
-
-    id -u "$STARY_USER" >/dev/null 2>&1 && userdel "$STARY_USER" 2>/dev/null || true
-fi
-
-# Po stěhování patří soubory uživateli, který už neexistuje. StateDirectory
-# to u založeného adresáře nedorovná, tak se to udělá rovnou tady.
-[ -d "$DATA_DIR" ] && chown -R "$USER_NAME:$USER_NAME" "$DATA_DIR"
 
 # Zastavit se dá jen to, co běží — při první instalaci služba ještě není.
 if systemctl is-active --quiet "$SERVICE"; then
@@ -272,14 +226,6 @@ exec env PORT="$PORT" GITEA="$GITEA" REPO="$REPO" bash "$HOME_DIR/install.sh"
 UPDATE
 chmod 755 /usr/bin/update
 ok "Aktualizovat půjde příkazem: update"
-
-# Teď už je `$0` zkopírovaný na nové místo a starý domov nikdo nepotřebuje.
-# Bash si drží otevřený popisovač na skript, takže smazat se dá i ten, který
-# se zrovna vykonává.
-if [ -d "$STARY_HOME" ]; then
-    rm -rf "$STARY_HOME"
-    ok "Staré $STARY_HOME uklizeno"
-fi
 
 msg "Čekám, až začne odpovídat"
 for _ in $(seq 30); do

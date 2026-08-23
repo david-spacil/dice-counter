@@ -93,9 +93,6 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET: dice-counter-linux-x86_64
-          # Instalátory z dřívějška si chodí pro staré jméno. Až budou
-          # přemigrované, přestane se pod ním věšet.
-          STARY_ASSET: kostky-linux-x86_64
         run: |
           api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
           auth="Authorization: token ${TOKEN}"
@@ -113,12 +110,10 @@ jobs:
 
           # Součet se počítá nad jménem, pod kterým se soubor stahuje, aby
           # šel ověřit rovnou: sha256sum -c dice-counter-linux-x86_64.sha256
-          for jmeno in "$ASSET" "$STARY_ASSET"; do
-              cp dist/dice-counter "$jmeno"
-              sha256sum "$jmeno" | tee "$jmeno.sha256"
-          done
+          cp dist/dice-counter "$ASSET"
+          sha256sum "$ASSET" | tee "$ASSET.sha256"
 
-          for file in "$ASSET" "$ASSET.sha256" "$STARY_ASSET" "$STARY_ASSET.sha256"; do
+          for file in "$ASSET" "$ASSET.sha256"; do
               # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
               curl -s -H "$auth" "$api/releases/$id/assets" \
                   | python3 -c 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == sys.argv[1]]' "$file" \

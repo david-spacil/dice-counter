@@ -93,10 +93,6 @@ server vypíše při startu.
 | binárkou na Windows | `%LOCALAPPDATA%\dice-counter\dice.db` |
 | ze zdrojáků | `dice.db` v pracovním adresáři |
 
-Do vydání 1.2.x se adresář jmenoval `kostky`. Kdo databázi po staru má, o ni
-nepřijde — dokud nová neexistuje, používá se dál ta stará. Přesunout se dá
-kdykoli ručně, přejmenováním adresáře.
-
 Binárka se při každém spuštění rozbaluje do dočasného adresáře a pouští se
 odkudkoli, takže relativní cesta by databázi rozsypala po disku — proto
 napevno domovský adresář. Ze zdrojáků zůstává relativní, ať se dá mít víc
@@ -173,13 +169,6 @@ CTID=123 MODE=update bash -c "$(curl -fsSL ...)"
 Obojí vymění binárku za poslední vydání a službu restartuje; databáze zůstává.
 Příkaz `update` si přitom obnoví i sám sebe — instalátor bere z větve `main`,
 takže jede na nejnovější verzi skriptu, ne na té, se kterou se instalovalo.
-
-Kontejnery založené do vydání 1.2.x se při první aktualizaci přejmenují ze
-starého `kostky`: služba, uživatel i cesty dostanou nová jména a databáze se
-přestěhuje z `/var/lib/kostky` do `/var/lib/dice-counter`. Dělá se to samo
-a stačí na to obyčejný `update`; historie her zůstává. Původní adresa skriptu
-(`deploy/pve-kostky.sh`) proto ještě chvíli funguje — jen přesměrovává na
-novou.
 
 Do konzole kontejneru se dostaneš přímo z webu Proxmoxu, **žádné jméno ani
 heslo se nezadává** — kontejner root heslo nemá a konzole se přihlašuje sama.
@@ -379,10 +368,6 @@ ověřit:
 ```bash
 sha256sum -c dice-counter-linux-x86_64.sha256   # na macOS: shasum -a 256 -c
 ```
-
-Do vydání 1.2.x se přílohy jmenovaly `kostky-*`. Ještě chvíli se budou věšet
-pod oběma jmény, ať fungují instalace, které si o ně říkají po staru. Až budou
-přemigrované, zůstane jen `dice-counter-*`.
 
 Nad pull requesty se Linux staví taky, jen se nikam nevěší. Totéž platí pro
 kontejnerový image — doma se nad každým PR postaví a zkusí nastartovat

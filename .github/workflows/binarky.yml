@@ -29,25 +29,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `stary` je jméno, pod kterým se příloha věšela do vydání 1.2.x.
-        # Instalátory z té doby si chodí pro něj, tak se pověsí obojí.
-        # Až budou přemigrované, sloupec zmizí.
         include:
           - os: windows-latest
             asset: dice-counter-windows-x86_64.exe
-            stary: kostky-windows-x86_64.exe
             built: dist/dice-counter.exe
           - os: macos-15-intel    # Intel; macos-13 GitHub zrušil
             asset: dice-counter-macos-x86_64
-            stary: kostky-macos-x86_64
             built: dist/dice-counter
           - os: macos-latest      # Apple Silicon
             asset: dice-counter-macos-arm64
-            stary: kostky-macos-arm64
             built: dist/dice-counter
           - os: ubuntu-24.04-arm  # pro Raspberry Pi a spol.
             asset: dice-counter-linux-arm64
-            stary: kostky-linux-arm64
             built: dist/dice-counter
 
     runs-on: ${{ matrix.os }}
@@ -104,7 +97,6 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITEA_TOKEN }}
           ASSET: ${{ matrix.asset }}
-          STARY_ASSET: ${{ matrix.stary }}
         run: |
           api="$GITEA/api/v1/repos/$GITEA_REPO"
           auth="Authorization: token $TOKEN"
@@ -133,12 +125,10 @@ jobs:
 
           # Součet se počítá nad jménem, pod kterým se soubor stahuje, aby
           # šel ověřit rovnou: shasum -a 256 -c dice-counter-macos-arm64.sha256
-          for jmeno in "$ASSET" "$STARY_ASSET"; do
-              cp "${{ matrix.built }}" "$jmeno"
-              soucet "$jmeno" | tee "$jmeno.sha256"
-          done
+          cp "${{ matrix.built }}" "$ASSET"
+          soucet "$ASSET" | tee "$ASSET.sha256"
 
-          for file in "$ASSET" "$ASSET.sha256" "$STARY_ASSET" "$STARY_ASSET.sha256"; do
+          for file in "$ASSET" "$ASSET.sha256"; do
               # Aby se dal build zopakovat, stará příloha stejného jména jde pryč.
               curl -s -H "$auth" "$api/releases/$id/assets" \
                   | json 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin) if a["name"] == sys.argv[1]]' "$file" \

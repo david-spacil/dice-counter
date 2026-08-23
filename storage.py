@@ -27,14 +27,6 @@ def data_home() -> Path:
                 or Path.home() / ".local" / "share")
 
 
-APP_DIR = "dice-counter"
-
-# Do vydání 1.2.x se adresář jmenoval jinak. Kdo má databázi po staru, o ni
-# přejmenováním nepřijde — použije se dál. Až se stará jména přestanou
-# podporovat, zmizí i tohle.
-STARY_APP_DIR = "kostky"
-
-
 def default_db() -> Path:
     """Kam se ukládá databáze.
 
@@ -46,14 +38,9 @@ def default_db() -> Path:
     chosen = os.environ.get("DICE_DB")
     if chosen:
         return Path(chosen)
-    if not getattr(sys, "frozen", False):
-        return Path("dice.db")
-
-    nova = data_home() / APP_DIR / "dice.db"
-    stara = data_home() / STARY_APP_DIR / "dice.db"
-    if not nova.exists() and stara.exists():
-        return stara
-    return nova
+    if getattr(sys, "frozen", False):
+        return data_home() / "dice-counter" / "dice.db"
+    return Path("dice.db")
 
 
 DB_PATH = default_db()

@@ -155,28 +155,6 @@ def test_umisteni_databaze_z_binarky(monkeypatch, tmp_path):
     assert storage.default_db() == tmp_path / "dice-counter" / "dice.db"
 
 
-def test_umisteni_databaze_po_starem(monkeypatch, tmp_path):
-    """Kdo má databázi pod starým jménem, o ni přejmenováním nepřijde."""
-    monkeypatch.delenv("DICE_DB", raising=False)
-    monkeypatch.setattr(storage.sys, "frozen", True, raising=False)
-    monkeypatch.setattr(storage.sys, "platform", "linux")
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-
-    stara = tmp_path / "kostky" / "dice.db"
-    stara.parent.mkdir()
-    stara.touch()
-
-    assert storage.default_db() == stara
-
-    # Jakmile nová existuje, stará se ignoruje — jinak by se dvě databáze
-    # přetahovaly o to, která platí.
-    nova = tmp_path / "dice-counter" / "dice.db"
-    nova.parent.mkdir()
-    nova.touch()
-
-    assert storage.default_db() == nova
-
-
 def test_data_home_podle_systemu(monkeypatch, tmp_path):
     """Každý systém má svůj adresář na data; XDG je jen ten linuxový."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "AppData" / "Local"))
