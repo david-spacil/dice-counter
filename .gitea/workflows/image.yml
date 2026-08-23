@@ -46,19 +46,19 @@ jobs:
         run: |
           docker build -f deploy/Dockerfile \
               --build-arg VERSION="zkouska-${GITHUB_SHA:0:7}" \
-              -t kostky:zkouska .
+              -t dice-counter:zkouska .
 
       - name: Zkouška
         run: |
-          trap 'docker rm -f kostky-zkouska >/dev/null 2>&1 || true' EXIT
+          trap 'docker rm -f dice-counter-zkouska >/dev/null 2>&1 || true' EXIT
 
           # Port musí být stejný uvnitř i venku: appka poslouchá na DICE_PORT,
           # takže mapovat ho na jiný by znamenalo mířit do prázdna.
           # Adresa se vnucuje, ať zkouška nezávisí na síti runneru a dá se
           # ověřit, co přesně tabule nabídne.
-          docker run -d --name kostky-zkouska --init \
+          docker run -d --name dice-counter-zkouska --init \
               -p "${ZKOUSKA_PORT}:${ZKOUSKA_PORT}" -e DICE_HOST=127.0.0.1 \
-              -e DICE_PORT="${ZKOUSKA_PORT}" kostky:zkouska
+              -e DICE_PORT="${ZKOUSKA_PORT}" dice-counter:zkouska
 
           for _ in $(seq 30); do
               curl -sf -o /dev/null "http://127.0.0.1:${ZKOUSKA_PORT}/" && break
@@ -67,19 +67,19 @@ jobs:
 
           curl -sf -o /dev/null "http://127.0.0.1:${ZKOUSKA_PORT}/" || {
               echo "Kontejner se nerozeběhl." >&2
-              docker logs kostky-zkouska >&2
+              docker logs dice-counter-zkouska >&2
               exit 1; }
           curl -sf -o /dev/null "http://127.0.0.1:${ZKOUSKA_PORT}/static/style.css"
           curl -sf "http://127.0.0.1:${ZKOUSKA_PORT}/board" | grep -q "127.0.0.1:${ZKOUSKA_PORT}"
           curl -sf -o /dev/null "http://127.0.0.1:${ZKOUSKA_PORT}/export"
 
           # Verze se musí do image opravdu dostat, ne se hlásit jako neznámá.
-          docker run --rm kostky:zkouska python web.py --version
-          ! docker run --rm kostky:zkouska python web.py --version | grep -q "neznámá"
+          docker run --rm dice-counter:zkouska python web.py --version
+          ! docker run --rm dice-counter:zkouska python web.py --version | grep -q "neznámá"
 
-          docker logs kostky-zkouska
+          docker logs dice-counter-zkouska
           echo "Image jede."
 
       - name: Úklid
         if: always()
-        run: docker rmi kostky:zkouska >/dev/null 2>&1 || true
+        run: docker rmi dice-counter:zkouska >/dev/null 2>&1 || true
