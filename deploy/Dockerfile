@@ -13,6 +13,15 @@ FROM python:3.11-slim
 # Verze se jinak nemá kde vzít — v image není git ani zabalená binárka.
 ARG VERSION=neznámá
 
+# Podle image.source si Gitea připne balíček k repozitáři. Bez toho labelu
+# image sice existuje, ale visí jen pod uživatelem a záložka Packages
+# u repozitáře zůstane prázdná.
+LABEL org.opencontainers.image.source="https://gitea.spacilovi.eu/david-spacil/dice-counter" \
+      org.opencontainers.image.url="https://gitea.spacilovi.eu/david-spacil/dice-counter" \
+      org.opencontainers.image.title="dice-counter" \
+      org.opencontainers.image.description="Počitadlo kostek: telefon zapisuje skóre, notebook ukazuje zápisník" \
+      org.opencontainers.image.version="$VERSION"
+
 RUN useradd --system --uid 1000 --home-dir /app --shell /usr/sbin/nologin dice-counter
 
 WORKDIR /app
